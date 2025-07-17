@@ -1,0 +1,52 @@
+# --- Frontend React app ---
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/coverage/
+frontend/.nyc_output/
+frontend/.DS_Store
+frontend/Thumbs.db
+frontend/.idea/
+frontend/.vscode/
+# Node.js
+node_modules/
+
+# Dependency lock files (keep only the one you use)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+*.log
+logs/
+
+# Test & coverage output
+coverage/
+.nyc_output/
+
+# Environment variables
+.env
+
+# Build output
+build/
+dist/
+
+# VS Code settings
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# Mac system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux system files
+*~
+.project
+.classpath
+.settings/
