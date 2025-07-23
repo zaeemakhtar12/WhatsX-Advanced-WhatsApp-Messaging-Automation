@@ -1,66 +1,59 @@
 const mongoose = require('mongoose');
 
 const scheduledMessageSchema = new mongoose.Schema({
-  senderId: { 
+  userId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
     required: true 
   },
-  title: { 
+  recipient: { 
     type: String, 
-    required: true,
-    trim: true
+    required: true 
+  },
+  recipientName: { 
+    type: String 
   },
   message: { 
     type: String, 
     required: true 
   },
-  recipients: [{
-    name: { type: String, required: true },
-    number: { type: String, required: true }
-  }],
+  messageType: {
+    type: String,
+    enum: ['regular', 'template'],
+    default: 'regular'
+  },
+  templateId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Template'
+  },
   scheduledDate: { 
     type: Date, 
     required: true 
   },
-  status: { 
+  scheduledTime: { 
     type: String, 
-    enum: ['scheduled', 'sent', 'failed', 'cancelled'], 
-    default: 'scheduled' 
+    required: true 
   },
-  messageType: { 
-    type: String, 
-    enum: ['regular', 'whatsapp_message', 'whatsapp_template'], 
-    default: 'whatsapp_message' 
+  isRecurring: { 
+    type: Boolean, 
+    default: false 
   },
-  templateName: { type: String }, // For template messages
-  templateVariables: { type: Object }, // Variables for template messages
+  recurringPattern: {
+    type: String,
+    enum: ['daily', 'weekly', 'monthly'],
+    required: function() { return this.isRecurring; }
+  },
+  isExecuted: { 
+    type: Boolean, 
+    default: false 
+  },
+  executedAt: { 
+    type: Date 
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 
-  },
-  sentAt: { 
-    type: Date 
-  },
-  results: [{
-    recipient: String,
-    status: String,
-    error: String,
-    messageSid: String
-  }],
-  recurring: {
-    enabled: { type: Boolean, default: false },
-    frequency: { 
-      type: String, 
-      enum: ['daily', 'weekly', 'monthly'], 
-      default: 'daily' 
-    },
-    nextRun: { type: Date }
   }
 });
-
-// Index for efficient querying of scheduled messages
-scheduledMessageSchema.index({ scheduledDate: 1, status: 1 });
-scheduledMessageSchema.index({ senderId: 1 });
 
 module.exports = mongoose.model('ScheduledMessage', scheduledMessageSchema); 

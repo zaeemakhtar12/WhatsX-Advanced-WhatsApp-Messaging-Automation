@@ -8,7 +8,7 @@ function LoginForm({ onLogin, role = 'user' }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await login(email, password, role); // Always send role
+      const response = await login({ email, password, role });
       if (response.token) {
         localStorage.setItem('token', response.token);
         if (response.role) {

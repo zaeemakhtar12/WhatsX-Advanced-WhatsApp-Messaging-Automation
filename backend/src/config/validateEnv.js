@@ -2,10 +2,7 @@
 function validateEnvironment() {
   const requiredEnvVars = [
     'MONGO_URI',
-    'JWT_SECRET',
-    'TWILIO_ACCOUNT_SID',
-    'TWILIO_AUTH_TOKEN',
-    'TWILIO_WHATSAPP_FROM'
+    'JWT_SECRET'
   ];
 
   const missingVars = [];
@@ -31,19 +28,19 @@ function validateEnvironment() {
 
   // Log warnings
   if (warnings.length > 0) {
-    console.warn('⚠️  Environment Warnings:');
+    console.warn('Environment Warnings:');
     warnings.forEach(warning => console.warn(`   ${warning}`));
   }
 
   // Error on missing required variables
   if (missingVars.length > 0) {
-    console.error('❌ Missing required environment variables:');
+    console.error('Missing required environment variables:');
     missingVars.forEach(varName => console.error(`   ${varName}`));
-    console.error('\n💡 Create a .env file with the missing variables');
+    console.error('\nCreate a .env file with the missing variables');
     process.exit(1);
   }
 
-  console.log('✅ Environment variables validated');
+  console.log('Environment variables validated');
 }
 
 module.exports = { validateEnvironment }; 

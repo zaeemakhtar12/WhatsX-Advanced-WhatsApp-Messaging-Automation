@@ -3,21 +3,20 @@ const mongoose = require('mongoose');
 const messageSchema = new mongoose.Schema({
   senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   recipient: { type: String, required: true },
+  recipientName: { type: String },
   message: { type: String, required: true },
   messageType: { 
     type: String, 
-    enum: ['regular', 'whatsapp_message', 'whatsapp_template', 'bulk_whatsapp_template'], 
-    default: 'regular' 
+    enum: ['regular', 'bulk', 'template', 'scheduled'],
+    default: 'regular'
   },
-  templateName: { type: String }, // For template messages
-  templateVariables: { type: Object }, // Variables used in template
-  twilioSid: { type: String }, // Twilio message SID for tracking
+  templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'Template' },
   status: { 
     type: String, 
-    enum: ['sent', 'delivered', 'failed', 'pending'], 
-    default: 'sent' 
+    enum: ['sent', 'delivered', 'failed', 'pending'],
+    default: 'sent'
   },
-  timestamp: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Message', messageSchema);

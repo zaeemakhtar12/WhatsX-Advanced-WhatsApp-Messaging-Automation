@@ -3,13 +3,11 @@ const router = express.Router();
 const messageController = require('../controllers/messageController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
-// Existing routes
+// Message routes
 router.post('/send', verifyToken, messageController.sendMessage);
-router.get('/logs', verifyToken, messageController.getMessageLogs);
-
-// New WhatsApp routes
-router.post('/whatsapp/template', verifyToken, messageController.sendWhatsAppTemplate);
-router.post('/whatsapp/bulk-template', verifyToken, messageController.sendBulkWhatsAppTemplate);
-router.post('/whatsapp/message', verifyToken, messageController.sendWhatsAppMessage);
+router.post('/bulk', verifyToken, messageController.sendBulkMessage);
+router.get('/messages', verifyToken, messageController.getMessages);
+router.get('/messages/stats', verifyToken, messageController.getMessageStats);
+router.delete('/messages/:id', verifyToken, messageController.deleteMessage);
 
 module.exports = router;

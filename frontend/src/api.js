@@ -1,311 +1,127 @@
-const API_URL = "http://localhost:5000/api";
+import apiClient from './utils/apiClient';
 
-// const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = 'http://localhost:5000/api';
 
-export const login = async (email, password, role) => {
-  const res = await fetch(`${API_URL}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, role }), // send role
-  });
-  return res.json();
-};
-
-
-export const register = async (data) => {
+// User APIs
+export const register = async (userData) => {
   const res = await fetch(`${API_URL}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  return res.json();
-};
-
-// Admin User Management APIs
-export const getAllUsers = async () => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/users`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const getUserById = async (id) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/users/${id}`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const updateUser = async (id, userData) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/users/${id}`, {
-    method: 'PUT',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
     body: JSON.stringify(userData),
   });
   return res.json();
 };
 
-export const deleteUser = async (id) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/users/${id}`, {
+export const login = async (userData) => {
+  const res = await fetch(`${API_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData),
+  });
+  return res.json();
+};
+
+// User Management APIs (Admin only)
+export const getUsers = async () => {
+  return apiClient.get('/users');
+};
+
+export const updateUserRole = async (userId, role) => {
+  return apiClient.put(`/users/${userId}/role`, { role });
+};
+
+export const deleteUser = async (userId) => {
+  return apiClient.delete(`/users/${userId}`);
+};
+
+// Message APIs
+export const sendMessage = async (messageData) => {
+  const res = await fetch(`${API_URL}/send`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify(messageData),
+  });
+  return res.json();
+};
+
+export const sendBulkMessage = async (contacts, message, templateId = null) => {
+  const res = await fetch(`${API_URL}/bulk`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    body: JSON.stringify({ contacts, message, templateId }),
+  });
+  return res.json();
+};
+
+export const getMessages = async (page = 1, limit = 10, search = '', messageType = '') => {
+  const params = new URLSearchParams({ page, limit, search, messageType });
+  const res = await fetch(`${API_URL}/messages?${params}`, {
+    headers: { 
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+  });
+  return res.json();
+};
+
+export const getMessageStats = async () => {
+  const res = await fetch(`${API_URL}/messages/stats`, {
+    headers: { 
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+  });
+  return res.json();
+};
+
+export const deleteMessage = async (messageId) => {
+  const res = await fetch(`${API_URL}/messages/${messageId}`, {
     method: 'DELETE',
     headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
     },
   });
   return res.json();
 };
 
-export const updateUserRole = async (id, role) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/users/${id}/role`, {
-    method: 'PATCH',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ role }),
-  });
-  return res.json();
+// Scheduled Message APIs
+export const createScheduledMessage = async (messageData) => {
+  return apiClient.post('/scheduled-messages', messageData);
 };
 
-// WhatsApp Template Messaging APIs
-export const sendWhatsAppTemplate = async (recipient, templateName, templateVariables) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/whatsapp/template`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ recipient, templateName, templateVariables }),
-  });
-  return res.json();
+export const getScheduledMessages = async () => {
+  return apiClient.get('/scheduled-messages');
 };
 
-export const sendBulkWhatsAppTemplate = async (contacts, templateName, templateVariables) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/whatsapp/bulk-template`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ contacts, templateName, templateVariables }),
-  });
-  return res.json();
-};
-
-export const sendWhatsAppMessage = async (recipient, message) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/whatsapp/message`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ recipient, message }),
-  });
-  return res.json();
-};
-
-// Template Management APIs
-export const getTemplates = async (category = '', search = '', page = 1, limit = 20) => {
-  const token = localStorage.getItem('token');
-  const queryParams = new URLSearchParams();
-  if (category) queryParams.append('category', category);
-  if (search) queryParams.append('search', search);
-  queryParams.append('page', page);
-  queryParams.append('limit', limit);
-  
-  const res = await fetch(`${API_URL}/templates?${queryParams}`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const getTemplate = async (id) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/templates/${id}`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const createTemplate = async (templateData) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/templates`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(templateData),
-  });
-  return res.json();
-};
-
-export const updateTemplate = async (id, templateData) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/templates/${id}`, {
-    method: 'PUT',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(templateData),
-  });
-  return res.json();
-};
-
-export const deleteTemplate = async (id) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/templates/${id}`, {
-    method: 'DELETE',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const useTemplate = async (id, variables) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/templates/${id}/use`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ variables }),
-  });
-  return res.json();
-};
-
-export const getTemplateCategories = async () => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/templates/categories`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const getTemplateStats = async () => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/templates-stats`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-// Scheduled Messages API
-export const createScheduledMessage = async (scheduledMessageData) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/scheduled-messages`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(scheduledMessageData),
-  });
-  return res.json();
-};
-
-export const getScheduledMessages = async (status = '', page = 1, limit = 10) => {
-  const token = localStorage.getItem('token');
-  const queryParams = new URLSearchParams();
-  if (status) queryParams.append('status', status);
-  queryParams.append('page', page);
-  queryParams.append('limit', limit);
-  
-  const res = await fetch(`${API_URL}/scheduled-messages?${queryParams}`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const getScheduledMessage = async (id) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/scheduled-messages/${id}`, {
-    method: 'GET',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
-};
-
-export const updateScheduledMessage = async (id, updateData) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/scheduled-messages/${id}`, {
-    method: 'PUT',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(updateData),
-  });
-  return res.json();
+export const updateScheduledMessage = async (id, updates) => {
+  return apiClient.put(`/scheduled-messages/${id}`, updates);
 };
 
 export const deleteScheduledMessage = async (id) => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/scheduled-messages/${id}`, {
-    method: 'DELETE',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
+  return apiClient.delete(`/scheduled-messages/${id}`);
 };
 
-export const executeScheduledMessages = async () => {
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_URL}/scheduled-messages/execute`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-  });
-  return res.json();
+// Template APIs
+export const getTemplates = async () => {
+  return apiClient.get('/templates');
+};
+
+export const createTemplate = async (templateData) => {
+  return apiClient.post('/templates', templateData);
+};
+
+export const updateTemplate = async (id, updates) => {
+  return apiClient.put(`/templates/${id}`, updates);
+};
+
+export const deleteTemplate = async (id) => {
+  return apiClient.delete(`/templates/${id}`);
+};
+
+export const getTemplateStats = async () => {
+  return apiClient.get('/templates/stats');
 };

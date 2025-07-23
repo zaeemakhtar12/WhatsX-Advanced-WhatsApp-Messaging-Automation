@@ -1,21 +1,19 @@
 const express = require('express');
-const router = express.Router();
 const templateController = require('../controllers/templateController');
-const { verifyToken, checkRole } = require('../middleware/authMiddleware');
+const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
-// All routes require authentication
-router.use(verifyToken);
+const router = express.Router();
 
-// Public routes (accessible to all authenticated users)
-router.get('/templates', templateController.getTemplates);
-router.get('/templates/categories', templateController.getCategories);
-router.get('/templates/:id', templateController.getTemplate);
-router.post('/templates/:id/use', templateController.useTemplate);
+// Routes accessible to all authenticated users
+router.get('/templates', verifyToken, templateController.getTemplates);
+router.get('/templates/categories', verifyToken, templateController.getTemplateCategories);
+router.get('/templates/:id', verifyToken, templateController.getTemplate);
+router.post('/templates/:id/use', verifyToken, templateController.useTemplate);
 
-// Admin-only routes
-router.post('/templates', checkRole('admin'), templateController.createTemplate);
-router.put('/templates/:id', checkRole('admin'), templateController.updateTemplate);
-router.delete('/templates/:id', checkRole('admin'), templateController.deleteTemplate);
-router.get('/templates-stats', checkRole('admin'), templateController.getTemplateStats);
+// Routes accessible to admin users only
+router.post('/templates', verifyToken, requireRole('admin'), templateController.createTemplate);
+router.put('/templates/:id', verifyToken, requireRole('admin'), templateController.updateTemplate);
+router.delete('/templates/:id', verifyToken, requireRole('admin'), templateController.deleteTemplate);
+router.get('/templates-stats', verifyToken, requireRole('admin'), templateController.getTemplateStats);
 
 module.exports = router; 

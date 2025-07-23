@@ -1,392 +1,412 @@
 import React, { useState, useEffect } from 'react';
+import { getMessages, deleteMessage } from '../api';
 
 function MessageLog() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [messageType, setMessageType] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [messagesPerPage] = useState(10);
+  const [pagination, setPagination] = useState({});
+  const [notification, setNotification] = useState('');
+
+  const messagesPerPage = 10;
+
+  // Auto-dismiss notification after 4 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification('');
+      }, 4000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   useEffect(() => {
     fetchMessages();
-  }, []);
+  }, [currentPage, searchTerm, messageType]);
 
   const fetchMessages = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const response = await getMessages(currentPage, messagesPerPage, searchTerm, messageType);
       
-      const response = await fetch('http://localhost:5000/api/logs', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Message logs response:', data);
-      
-      if (data.messages) {
-        setMessages(data.messages);
-      } else {
-        setMessages([]);
+      if (response && response.messages) {
+        setMessages(response.messages);
+        setPagination(response.pagination || {});
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
-      setError('Failed to load message logs');
+      setNotification('Failed to fetch messages');
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter and search messages
-  const filteredMessages = messages.filter(msg => {
-    const matchesSearch = searchTerm === '' || 
-      msg.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.recipient.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesType = filterType === '' || msg.messageType === filterType;
-    const matchesStatus = filterStatus === '' || msg.status === filterStatus;
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
+  const handleDelete = async (messageId) => {
+    if (window.confirm('Are you sure you want to delete this message?')) {
+      try {
+        await deleteMessage(messageId);
+        setNotification('Message deleted successfully');
+        fetchMessages(); // Refresh the list
+      } catch (error) {
+        console.error('Error deleting message:', error);
+        setNotification('Failed to delete message');
+      }
+    }
+  };
 
-  // Pagination
-  const indexOfLastMessage = currentPage * messagesPerPage;
-  const indexOfFirstMessage = indexOfLastMessage - messagesPerPage;
-  const currentMessages = filteredMessages.slice(indexOfFirstMessage, indexOfLastMessage);
-  const totalPages = Math.ceil(filteredMessages.length / messagesPerPage);
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setCurrentPage(1);
+    fetchMessages();
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.total) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const getMessageTypeIcon = (type) => {
+    switch (type) {
+      case 'regular': return 'MSG';
+      case 'bulk': return 'BULK';
+      case 'template': return 'TMPL';
+      case 'scheduled': return 'SCHD';
+      default: return 'MSG';
+    }
+  };
+
+  const getMessageTypeLabel = (type) => {
+    switch (type) {
+      case 'regular': return 'Regular';
+      case 'bulk': return 'Bulk';
+      case 'template': return 'Template';
+      case 'scheduled': return 'Scheduled';
+      default: return 'Unknown';
+    }
+  };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const date = new Date(dateString);
+    return date.toLocaleString();
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'sent': return '#4CAF50';
-      case 'delivered': return '#2196F3';
-      case 'failed': return '#f44336';
-      case 'pending': return '#FF9800';
-      default: return '#666';
+      if (loading && currentPage === 1) {
+      return (
+        <div style={{ padding: '24px 24px 24px 48px', textAlign: 'center', background: '#F0F2F5' }}>
+          <div style={{ fontSize: 18, color: '#6B7280' }}>Loading messages...</div>
+        </div>
+      );
     }
-  };
-
-  const getTypeIcon = (messageType) => {
-    switch (messageType) {
-      case 'whatsapp_message': return '📱';
-      case 'whatsapp_template': return '📋';
-      case 'bulk_whatsapp_template': return '📊';
-      case 'regular': return '💬';
-      default: return '📧';
-    }
-  };
-
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const clearFilters = () => {
-    setSearchTerm('');
-    setFilterType('');
-    setFilterStatus('');
-    setCurrentPage(1);
-  };
-
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div style={{ fontSize: '18px', color: '#666' }}>Loading message logs...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div style={{ color: '#f44336', fontSize: '16px' }}>{error}</div>
-        <button onClick={fetchMessages} style={buttonStyle}>Retry</button>
-      </div>
-    );
-  }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ color: '#222', margin: 0 }}>Message Logs</h2>
-        <button onClick={fetchMessages} style={buttonStyle}>
-          🔄 Refresh
-        </button>
-      </div>
-
-      {/* Filters and Search */}
-      <div style={{ 
-        background: '#f9f9f9', 
-        padding: '20px', 
-        borderRadius: '8px', 
-        marginBottom: '20px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '15px'
-      }}>
-        {/* Search */}
-        <div>
-          <label style={labelStyle}>Search Messages</label>
-          <input
-            type="text"
-            placeholder="Search by message or recipient..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Message Type Filter */}
-        <div>
-          <label style={labelStyle}>Message Type</label>
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={inputStyle}>
-            <option value="">All Types</option>
-            <option value="whatsapp_message">WhatsApp Message</option>
-            <option value="whatsapp_template">WhatsApp Template</option>
-            <option value="bulk_whatsapp_template">Bulk Template</option>
-            <option value="regular">Regular</option>
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div>
-          <label style={labelStyle}>Status</label>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={inputStyle}>
-            <option value="">All Status</option>
-            <option value="sent">Sent</option>
-            <option value="delivered">Delivered</option>
-            <option value="failed">Failed</option>
-            <option value="pending">Pending</option>
-          </select>
-        </div>
-
-        {/* Clear Filters */}
-        <div style={{ display: 'flex', alignItems: 'end' }}>
-          <button onClick={clearFilters} style={{ ...buttonStyle, backgroundColor: '#666' }}>
-            Clear Filters
+    <div style={{ padding: '24px 24px 24px 48px', maxWidth: 1200, margin: '0 auto', background: '#F0F2F5' }}>
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          top: 20,
+          right: 20,
+          background: notification.includes('Failed') ? '#DC2626' : '#25D366',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: 8,
+          boxShadow: notification.includes('Failed') 
+            ? '0 2px 10px rgba(220, 38, 38, 0.3)' 
+            : '0 2px 10px rgba(37, 211, 102, 0.3)',
+          zIndex: 1000
+        }}>
+          {notification}
+          <button 
+            onClick={() => setNotification('')}
+            style={{ marginLeft: 10, background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+          >
+            ×
           </button>
         </div>
+      )}
+
+      <h2 style={{ color: '#1F2937', marginBottom: 24, fontSize: 28, fontWeight: 700 }}>Message Log</h2>
+
+      {/* Search and Filter */}
+      <div style={{ 
+        background: '#fff', 
+        padding: 20, 
+        borderRadius: 12, 
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        marginBottom: 24,
+        border: '2px solid #E4E6EA'
+      }}>
+        <form onSubmit={handleSearch} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#374151' }}>
+              Search Messages
+            </label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by recipient, message content, or name..."
+              style={{ 
+                width: '100%', 
+                padding: 12, 
+                border: '2px solid #E4E6EA', 
+                borderRadius: 6, 
+                fontSize: 14 
+              }}
+            />
+          </div>
+          
+          <div style={{ minWidth: 150 }}>
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#374151' }}>
+              Message Type
+            </label>
+            <select
+              value={messageType}
+              onChange={(e) => setMessageType(e.target.value)}
+              style={{ 
+                width: '100%', 
+                padding: 12, 
+                border: '2px solid #E4E6EA', 
+                borderRadius: 6, 
+                fontSize: 14 
+              }}
+            >
+              <option value="">All Types</option>
+              <option value="regular">Regular</option>
+              <option value="bulk">Bulk</option>
+              <option value="template">Template</option>
+              <option value="scheduled">Scheduled</option>
+            </select>
+          </div>
+          
+          <button
+            type="submit"
+            style={{
+              padding: '12px 24px',
+              background: '#25D366',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Search
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setMessageType('');
+              setCurrentPage(1);
+              fetchMessages();
+            }}
+            style={{
+              padding: '12px 24px',
+              background: '#6B7280',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Reset
+          </button>
+        </form>
       </div>
 
-      {/* Results Summary */}
-      <div style={{ marginBottom: '15px', color: '#666' }}>
-        Showing {currentMessages.length} of {filteredMessages.length} messages
-        {filteredMessages.length !== messages.length && ` (filtered from ${messages.length} total)`}
+      {/* Messages List */}
+      <div style={{ 
+        background: '#fff', 
+        borderRadius: 12, 
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        border: '2px solid #E4E6EA'
+      }}>
+        {messages.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6B7280' }}>
+            <div style={{ fontSize: 48, marginBottom: 16, color: '#25D366' }}>No Messages</div>
+            <div style={{ fontSize: 18, marginBottom: 8 }}>No messages found</div>
+            <div style={{ fontSize: 14 }}>
+              {searchTerm || messageType ? 'Try adjusting your search criteria' : 'Send your first message to see it here!'}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '50px 1fr 150px 120px 100px 80px', 
+              gap: 12,
+              padding: '16px 20px',
+              background: '#F7F8FA',
+              borderBottom: '2px solid #E4E6EA',
+              fontWeight: 600,
+              fontSize: 14,
+              color: '#374151'
+            }}>
+              <div>Type</div>
+              <div>Message Details</div>
+              <div>Recipient</div>
+              <div>Date</div>
+              <div>Status</div>
+              <div>Action</div>
+            </div>
+
+            {/* Messages */}
+            {messages.map((msg) => (
+              <div 
+                key={msg._id}
+                style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '50px 1fr 150px 120px 100px 80px', 
+                  gap: 12,
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #E4E6EA',
+                  alignItems: 'center',
+                  fontSize: 14
+                }}
+              >
+                <div style={{ 
+                  fontSize: 10, 
+                  textAlign: 'center', 
+                  fontWeight: 600, 
+                  color: '#fff',
+                  background: '#25D366',
+                  padding: '4px',
+                  borderRadius: 4
+                }}>
+                  {getMessageTypeIcon(msg.messageType)}
+                </div>
+                
+                <div>
+                  <div style={{ fontWeight: 600, color: '#1F2937', marginBottom: 4 }}>
+                    {msg.recipientName || 'Unknown'}
+                  </div>
+                  <div style={{ color: '#6B7280', fontSize: 12, lineHeight: 1.4 }}>
+                    {msg.message.length > 80 ? `${msg.message.substring(0, 80)}...` : msg.message}
+                  </div>
+                </div>
+                
+                <div style={{ color: '#374151', fontSize: 13 }}>
+                  {msg.recipient}
+                </div>
+                
+                <div style={{ color: '#6B7280', fontSize: 12 }}>
+                  {formatDate(msg.createdAt)}
+                </div>
+                
+                <div>
+                  <span style={{
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: msg.status === 'sent' ? '#DCFCE7' : 
+                               msg.status === 'delivered' ? '#DCFCE7' :
+                               msg.status === 'failed' ? '#FEE2E2' : '#F3F4F6',
+                    color: msg.status === 'sent' ? '#166534' : 
+                           msg.status === 'delivered' ? '#166534' :
+                           msg.status === 'failed' ? '#991B1B' : '#6B7280'
+                  }}>
+                    {getMessageTypeLabel(msg.messageType)}
+                  </span>
+                </div>
+                
+                <div>
+                  <button
+                    onClick={() => handleDelete(msg._id)}
+                    style={{
+                      padding: '6px 8px',
+                      background: '#DC2626',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      width: '100%'
+                    }}
+                    title="Delete message"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
-      {/* Messages Table */}
-      {currentMessages.length === 0 ? (
+      {/* Pagination */}
+      {pagination.total > 1 && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          gap: 12, 
+          marginTop: 24,
+          padding: 20
+        }}>
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            style={{
+              padding: '8px 16px',
+              background: currentPage === 1 ? '#E5E7EB' : '#25D366',
+              color: currentPage === 1 ? '#9CA3AF' : '#fff',
+              border: 'none',
+              borderRadius: 6,
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              fontSize: 14
+            }}
+          >
+            Previous
+          </button>
+          
+          <span style={{ color: '#6B7280', fontSize: 14 }}>
+            Page {pagination.current || currentPage} of {pagination.total || 1}
+          </span>
+          
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === pagination.total}
+            style={{
+              padding: '8px 16px',
+              background: currentPage === pagination.total ? '#E5E7EB' : '#25D366',
+              color: currentPage === pagination.total ? '#9CA3AF' : '#fff',
+              border: 'none',
+              borderRadius: 6,
+              cursor: currentPage === pagination.total ? 'not-allowed' : 'pointer',
+              fontSize: 14
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      {/* Summary */}
+      {pagination.totalRecords > 0 && (
         <div style={{ 
           textAlign: 'center', 
-          padding: '40px', 
-          background: '#f9f9f9', 
-          borderRadius: '8px',
-          color: '#666' 
+          color: '#6B7280', 
+          fontSize: 14, 
+          marginTop: 16 
         }}>
-          {messages.length === 0 ? 'No messages found.' : 'No messages match your filters.'}
+          Showing {pagination.count || 0} of {pagination.totalRecords || 0} messages
         </div>
-      ) : (
-        <>
-          <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr style={{ background: '#f5f5f5' }}>
-                  <th style={thStyle}>Date & Time</th>
-                  <th style={thStyle}>Type</th>
-                  <th style={thStyle}>Recipient</th>
-                  <th style={thStyle}>Message</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentMessages.map((msg) => (
-                  <tr key={msg._id} style={rowStyle}>
-                    <td style={tdStyle}>
-                      <div style={{ fontSize: '14px' }}>{formatDate(msg.timestamp)}</div>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span>{getTypeIcon(msg.messageType)}</span>
-                        <span style={{ fontSize: '12px' }}>
-                          {msg.messageType === 'whatsapp_message' ? 'WhatsApp' :
-                           msg.messageType === 'whatsapp_template' ? 'Template' :
-                           msg.messageType === 'bulk_whatsapp_template' ? 'Bulk Template' :
-                           'Regular'}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: '500' }}>{msg.recipient}</div>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ 
-                        maxWidth: '200px', 
-                        overflow: 'hidden', 
-                        textOverflow: 'ellipsis',
-                        fontSize: '14px'
-                      }}>
-                        {msg.message}
-                      </div>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        color: '#fff',
-                        backgroundColor: getStatusColor(msg.status)
-                      }}>
-                        {(msg.status || 'sent').toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <div style={{ fontSize: '12px', color: '#666' }}>
-                        {msg.twilioSid && (
-                          <div>SID: {msg.twilioSid.substring(0, 10)}...</div>
-                        )}
-                        {msg.templateName && (
-                          <div>Template: {msg.templateName}</div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              marginTop: '20px',
-              gap: '10px'
-            }}>
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                style={{
-                  ...buttonStyle,
-                  backgroundColor: currentPage === 1 ? '#ccc' : '#00b86b',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-                }}
-              >
-                Previous
-              </button>
-              
-              <div style={{ display: 'flex', gap: '5px' }}>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-                  <button
-                    key={pageNum}
-                    onClick={() => handlePageChange(pageNum)}
-                    style={{
-                      ...buttonStyle,
-                      backgroundColor: currentPage === pageNum ? '#00b86b' : '#f5f5f5',
-                      color: currentPage === pageNum ? '#fff' : '#333',
-                      minWidth: '35px',
-                      padding: '6px 8px'
-                    }}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                style={{
-                  ...buttonStyle,
-                  backgroundColor: currentPage === totalPages ? '#ccc' : '#00b86b',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-                }}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </>
       )}
     </div>
   );
 }
-
-// Styles
-const labelStyle = {
-  display: 'block',
-  fontWeight: '600',
-  color: '#333',
-  marginBottom: '5px',
-  fontSize: '14px'
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '8px 12px',
-  border: '1px solid #ddd',
-  borderRadius: '4px',
-  fontSize: '14px',
-  fontFamily: 'inherit'
-};
-
-const buttonStyle = {
-  backgroundColor: '#00b86b',
-  color: '#fff',
-  border: 'none',
-  padding: '8px 16px',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '14px',
-  fontWeight: '500'
-};
-
-const tableStyle = {
-  width: '100%',
-  borderCollapse: 'collapse'
-};
-
-const thStyle = {
-  padding: '12px',
-  textAlign: 'left',
-  fontWeight: '600',
-  color: '#333',
-  borderBottom: '2px solid #e0e0e0',
-  fontSize: '14px'
-};
-
-const tdStyle = {
-  padding: '12px',
-  borderBottom: '1px solid #f0f0f0',
-  fontSize: '14px',
-  color: '#555'
-};
-
-const rowStyle = {
-  '&:hover': {
-    backgroundColor: '#f9f9f9'
-  }
-};
 
 export default MessageLog; 

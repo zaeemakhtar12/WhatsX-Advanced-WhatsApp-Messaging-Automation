@@ -8,7 +8,7 @@ const {
     deleteUser, 
     updateUserRole 
 } = require('../controllers/userController');
-const { verifyToken, checkRole } = require('../middleware/authMiddleware');
+const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const ValidationMiddleware = require('../middleware/validation');
 
 const router = express.Router();
@@ -18,10 +18,10 @@ router.post('/register', ValidationMiddleware.validateRegistration, registerUser
 router.post('/login', ValidationMiddleware.validateLogin, loginUser);
 
 // Admin-protected routes
-router.get('/users', verifyToken, checkRole('admin'), getAllUsers);
-router.get('/users/:id', verifyToken, checkRole('admin'), getUserById);
-router.put('/users/:id', verifyToken, checkRole('admin'), updateUser);
-router.delete('/users/:id', verifyToken, checkRole('admin'), deleteUser);
-router.patch('/users/:id/role', verifyToken, checkRole('admin'), updateUserRole);
+router.get('/users', verifyToken, requireRole('admin'), getAllUsers);
+router.get('/users/:id', verifyToken, requireRole('admin'), getUserById);
+router.put('/users/:id', verifyToken, requireRole('admin'), updateUser);
+router.delete('/users/:id', verifyToken, requireRole('admin'), deleteUser);
+router.patch('/users/:id/role', verifyToken, requireRole('admin'), updateUserRole);
 
 module.exports = router;

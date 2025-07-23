@@ -1,27 +1,6 @@
 const Message = require('../models/messageModel');
-const twilio = require('twilio');
 
-// Function to initialize Twilio client when needed
-const getTwilioClient = () => {
-  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    console.error('❌ Twilio credentials not found in environment variables');
-    console.log('TWILIO_ACCOUNT_SID:', process.env.TWILIO_ACCOUNT_SID ? 'Set ✅' : 'Missing ❌');
-    console.log('TWILIO_AUTH_TOKEN:', process.env.TWILIO_AUTH_TOKEN ? 'Set ✅' : 'Missing ❌');
-    console.log('TWILIO_WHATSAPP_FROM:', process.env.TWILIO_WHATSAPP_FROM ? 'Set ✅' : 'Missing ❌');
-    return null;
-  }
-  
-  try {
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    console.log('✅ Twilio client initialized successfully');
-    return client;
-  } catch (error) {
-    console.error('❌ Twilio initialization error:', error.message);
-    return null;
-  }
-};
-
-// ✅ Send a regular message (existing functionality)
+// Send a regular message (existing functionality)
 const sendMessage = async (req, res) => {
   try {
     const { recipient, message } = req.body;
@@ -43,58 +22,10 @@ const sendMessage = async (req, res) => {
   }
 };
 
-// ✅ Send WhatsApp template message
-const sendWhatsAppTemplate = async (req, res) => {
+// Send bulk messages (without WhatsApp)
+const sendBulkMessage = async (req, res) => {
   try {
-    const { recipient, templateName, templateVariables } = req.body;
-    const senderId = req.user?.userId;
-
-    if (!senderId) return res.status(401).json({ error: 'Unauthorized' });
-
-    // Get Twilio client
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(500).json({ error: 'WhatsApp service not configured properly' });
-    }
-
-    // Format phone number for WhatsApp
-    const whatsappNumber = `whatsapp:${recipient}`;
-    const fromNumber = `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`;
-
-    // Send WhatsApp template message via Twilio
-    const message = await client.messages.create({
-      from: fromNumber,
-      to: whatsappNumber,
-      contentSid: templateName, // Template content SID
-      contentVariables: JSON.stringify(templateVariables || {})
-    });
-
-    // Save to database
-    const newMsg = new Message({
-      senderId,
-      recipient,
-      message: `Template: ${templateName}`,
-      messageType: 'whatsapp_template',
-      templateName,
-      templateVariables,
-      twilioSid: message.sid
-    });
-    await newMsg.save();
-
-    res.status(200).json({ 
-      message: 'WhatsApp template sent successfully!', 
-      messageSid: message.sid 
-    });
-  } catch (error) {
-    console.error('WhatsApp sending error:', error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// ✅ Send bulk WhatsApp template messages
-const sendBulkWhatsAppTemplate = async (req, res) => {
-  try {
-    const { contacts, templateName, templateVariables } = req.body;
+    const { contacts, message, templateId } = req.body;
     const senderId = req.user?.userId;
 
     if (!senderId) return res.status(401).json({ error: 'Unauthorized' });
@@ -102,150 +33,143 @@ const sendBulkWhatsAppTemplate = async (req, res) => {
       return res.status(400).json({ error: 'No contacts provided' });
     }
 
-    // Get Twilio client
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(500).json({ error: 'WhatsApp service not configured properly' });
-    }
-
-    const fromNumber = `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`;
     const results = [];
     const errors = [];
 
     // Send to each contact
     for (const contact of contacts) {
       try {
-        const whatsappNumber = `whatsapp:${contact.number}`;
-        
-        // Replace variables with contact-specific data if available
-        const personalizedVariables = {
-          ...templateVariables,
-          name: contact.name || templateVariables.name,
-          // Add more personalizations as needed
-        };
-
-        const message = await client.messages.create({
-          from: fromNumber,
-          to: whatsappNumber,
-          contentSid: templateName,
-          contentVariables: JSON.stringify(personalizedVariables)
-        });
-
-        // Save to database
+        // Create message record in database
         const newMsg = new Message({
           senderId,
-          recipient: contact.number,
-          message: `Bulk Template: ${templateName} to ${contact.name}`,
-          messageType: 'bulk_whatsapp_template',
-          templateName,
-          templateVariables: personalizedVariables,
-          twilioSid: message.sid
+          recipient: contact.number || contact.phone,
+          message: message || `Template message`,
+          messageType: templateId ? 'template' : 'bulk',
+          templateId: templateId || null,
+          recipientName: contact.name,
+          status: 'sent'
         });
+        
         await newMsg.save();
-
         results.push({
-          contact: contact.name,
-          number: contact.number,
-          status: 'sent',
-          messageSid: message.sid
+          contact: contact.number || contact.phone,
+          status: 'success',
+          messageId: newMsg._id
         });
-
       } catch (error) {
-        console.error(`Error sending to ${contact.number}:`, error);
         errors.push({
-          contact: contact.name,
-          number: contact.number,
+          contact: contact.number || contact.phone,
           error: error.message
         });
       }
     }
 
     res.status(200).json({
-      message: `Bulk WhatsApp templates sent! ${results.length} successful, ${errors.length} failed`,
+      message: 'Bulk messages processed',
+      totalSent: results.length,
+      totalErrors: errors.length,
       results,
       errors
     });
-
   } catch (error) {
-    console.error('Bulk WhatsApp sending error:', error);
+    console.error('Bulk message error:', error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// ✅ Send regular WhatsApp message (non-template)
-const sendWhatsAppMessage = async (req, res) => {
+// Get all messages for a user
+const getMessages = async (req, res) => {
   try {
-    const { recipient, message } = req.body;
+    const senderId = req.user?.userId;
+    if (!senderId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { page = 1, limit = 10, search = '', messageType = '' } = req.query;
+    
+    // Build filter
+    const filter = { senderId };
+    if (search) {
+      filter.$or = [
+        { recipient: { $regex: search, $options: 'i' } },
+        { message: { $regex: search, $options: 'i' } },
+        { recipientName: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (messageType) {
+      filter.messageType = messageType;
+    }
+
+    // Get paginated results
+    const skip = (page - 1) * limit;
+    const messages = await Message.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('templateId', 'name');
+
+    const total = await Message.countDocuments(filter);
+
+    res.status(200).json({
+      messages,
+      pagination: {
+        current: parseInt(page),
+        total: Math.ceil(total / limit),
+        count: messages.length,
+        totalRecords: total
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get message statistics
+const getMessageStats = async (req, res) => {
+  try {
+    const senderId = req.user?.userId;
+    if (!senderId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const stats = await Message.aggregate([
+      { $match: { senderId: req.user.userId } },
+      {
+        $group: {
+          _id: '$messageType',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const total = await Message.countDocuments({ senderId });
+    
+    res.status(200).json({
+      total,
+      byType: stats.reduce((acc, stat) => {
+        acc[stat._id] = stat.count;
+        return acc;
+      }, {})
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Delete a message
+const deleteMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
     const senderId = req.user?.userId;
 
     if (!senderId) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Get Twilio client
-    const client = getTwilioClient();
-    if (!client) {
-      return res.status(500).json({ error: 'WhatsApp service not configured properly' });
-    }
-
-    // Validate input
-    if (!recipient || !message) {
-      return res.status(400).json({ error: 'Recipient and message are required' });
-    }
-
-    // Format phone numbers properly for WhatsApp
-    let formattedRecipient = recipient.toString().trim();
-    
-    // Remove any non-digit characters except +
-    formattedRecipient = formattedRecipient.replace(/[^\d+]/g, '');
-    
-    // Add + if not present
-    if (!formattedRecipient.startsWith('+')) {
-      formattedRecipient = '+' + formattedRecipient;
-    }
-
-    const whatsappNumber = `whatsapp:${formattedRecipient}`;
-    const fromNumber = `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`;
-
-    console.log('📱 Sending WhatsApp message:');
-    console.log('From:', fromNumber);
-    console.log('To:', whatsappNumber);
-    console.log('Message:', message);
-
-    const twilioMessage = await client.messages.create({
-      from: fromNumber,
-      to: whatsappNumber,
-      body: message
+    const message = await Message.findOneAndDelete({ 
+      _id: id, 
+      senderId 
     });
 
-    console.log('✅ WhatsApp message sent successfully:', twilioMessage.sid);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
 
-    // Save to database
-    const newMsg = new Message({
-      senderId,
-      recipient: formattedRecipient,
-      message,
-      messageType: 'whatsapp_message',
-      twilioSid: twilioMessage.sid
-    });
-    await newMsg.save();
-
-    res.status(200).json({ 
-      message: 'WhatsApp message sent successfully!', 
-      messageSid: twilioMessage.sid 
-    });
-  } catch (error) {
-    console.error('❌ WhatsApp message error:', error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// ✅ Get message logs (enhanced)
-const getMessageLogs = async (req, res) => {
-  try {
-    const userId = req.user?.userId;
-    const messages = await Message.find({ senderId: userId })
-      .sort({ timestamp: -1 })
-      .populate('senderId', 'username email');
-    res.status(200).json({ messages });
+    res.status(200).json({ message: 'Message deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -253,8 +177,8 @@ const getMessageLogs = async (req, res) => {
 
 module.exports = {
   sendMessage,
-  sendWhatsAppTemplate,
-  sendBulkWhatsAppTemplate,
-  sendWhatsAppMessage,
-  getMessageLogs,
+  sendBulkMessage,
+  getMessages,
+  getMessageStats,
+  deleteMessage
 };
