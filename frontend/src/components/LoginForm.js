@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { login } from '../api';
 
-function LoginForm({ onLogin, role }) {
+function LoginForm({ onLogin, role = 'user' }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await login(email, password, role);
+      const response = await login(email, password, role); // Always send role
       if (response.token) {
         localStorage.setItem('token', response.token);
-        alert(`${role.toUpperCase()} logged in successfully`);
-        onLogin();
+        if (response.role) {
+          localStorage.setItem('role', response.role);
+        }
+        alert(`${response.role ? response.role.toUpperCase() : role.toUpperCase()} logged in successfully`);
+        onLogin && onLogin(response.role || role);
       } else {
         alert(response.message || 'Login failed');
       }

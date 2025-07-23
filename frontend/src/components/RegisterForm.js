@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { register } from '../api';
 
-function RegisterForm({ role }) {
+function RegisterForm({ role = 'user' }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -9,7 +9,7 @@ function RegisterForm({ role }) {
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      const response = await register({ username, email, password });
+      const response = await register({ username, email, password, role }); // Always send role
       if (response.token) {
         localStorage.setItem('token', response.token);
         alert(`${role.toUpperCase()} registered successfully`);

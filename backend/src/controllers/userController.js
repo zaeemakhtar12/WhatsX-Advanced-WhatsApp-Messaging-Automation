@@ -24,7 +24,7 @@ const registerUser = async (req, res) => {
             username,
             email,
             password: hashedPassword,
-            role,
+            role: role || "user", // Always store a role, default to 'user'
         });
 
         // Step 4: Save the user to the database
@@ -39,10 +39,10 @@ const registerUser = async (req, res) => {
 // Login user
 const loginUser = async (req, res) => {
     try {
-        const { email, password, role } = req.body; // ✅ also receive role
+        const { email, password, role } = req.body; // receive role
 
         // Step 1: Find user by email and role
-        const user = await User.findOne({ email, role }); // ✅ match both email and role
+        const user = await User.findOne({ email, role });
 
         if (!user) {
             return res.status(404).json({ message: 'User not found or role mismatch' });
@@ -61,10 +61,109 @@ const loginUser = async (req, res) => {
             { expiresIn: '1h' }
         );
 
-        // Step 4: Send token in the response
-        res.json({ message: 'Login successful', token });
+        // Step 4: Send token and role in the response
+        res.json({ message: 'Login successful', token, role: user.role });
     } catch (error) {
         console.error('Login Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Admin: Get all users
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find({}, '-password'); // Exclude password field
+        res.json(users);
+    } catch (error) {
+        console.error('Get Users Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Admin: Get user by ID
+const getUserById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await User.findById(id, '-password');
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        res.json(user);
+    } catch (error) {
+        console.error('Get User Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Admin: Update user
+const updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, email, role } = req.body;
+        
+        const user = await User.findByIdAndUpdate(
+            id,
+            { username, email, role },
+            { new: true, runValidators: true }
+        ).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        res.json({ message: 'User updated successfully', user });
+    } catch (error) {
+        console.error('Update User Error:', error);
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'Email already exists' });
+        }
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Admin: Delete user
+const deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const user = await User.findByIdAndDelete(id);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Delete User Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Admin: Update user role
+const updateUserRole = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { role } = req.body;
+        
+        if (!['user', 'admin'].includes(role)) {
+            return res.status(400).json({ message: 'Invalid role' });
+        }
+        
+        const user = await User.findByIdAndUpdate(
+            id,
+            { role },
+            { new: true }
+        ).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        res.json({ message: 'User role updated successfully', user });
+    } catch (error) {
+        console.error('Update Role Error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -72,4 +171,9 @@ const loginUser = async (req, res) => {
 module.exports = {
     registerUser,
     loginUser,
+    getAllUsers,
+    getUserById,
+    updateUser,
+    deleteUser,
+    updateUserRole,
 };
