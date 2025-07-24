@@ -13,7 +13,7 @@ router.post('/templates/:id/use', verifyToken, templateController.useTemplate);
 // Routes accessible to admin users only
 router.post('/templates', verifyToken, requireRole('admin'), templateController.createTemplate);
 router.put('/templates/:id', verifyToken, requireRole('admin'), templateController.updateTemplate);
-router.delete('/templates/:id', verifyToken, requireRole('admin'), templateController.deleteTemplate);
+router.delete('/templates/:id', verifyToken, templateController.deleteTemplate); // Allow users to delete their own templates
 router.get('/templates-stats', verifyToken, requireRole('admin'), templateController.getTemplateStats);
 
 module.exports = router; 

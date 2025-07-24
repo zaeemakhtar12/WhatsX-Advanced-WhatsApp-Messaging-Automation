@@ -18,7 +18,8 @@ export const login = async (userData) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData),
   });
-  return res.json();
+  const data = await res.json();
+  return data;
 };
 
 // User Management APIs (Admin only)
@@ -48,25 +49,12 @@ export const sendMessage = async (messageData) => {
 };
 
 export const sendBulkMessage = async (contacts, message, templateId = null) => {
-  const res = await fetch(`${API_URL}/bulk`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    },
-    body: JSON.stringify({ contacts, message, templateId }),
-  });
-  return res.json();
+  return apiClient.post('/bulk', { contacts, message, templateId });
 };
 
 export const getMessages = async (page = 1, limit = 10, search = '', messageType = '') => {
   const params = new URLSearchParams({ page, limit, search, messageType });
-  const res = await fetch(`${API_URL}/messages?${params}`, {
-    headers: { 
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    },
-  });
-  return res.json();
+  return apiClient.get(`/messages?${params}`);
 };
 
 export const getMessageStats = async () => {
@@ -79,13 +67,7 @@ export const getMessageStats = async () => {
 };
 
 export const deleteMessage = async (messageId) => {
-  const res = await fetch(`${API_URL}/messages/${messageId}`, {
-    method: 'DELETE',
-    headers: { 
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    },
-  });
-  return res.json();
+  return apiClient.delete(`/messages/${messageId}`);
 };
 
 // Scheduled Message APIs
@@ -124,4 +106,17 @@ export const deleteTemplate = async (id) => {
 
 export const getTemplateStats = async () => {
   return apiClient.get('/templates/stats');
+};
+
+// Dashboard Statistics APIs
+export const getDashboardStats = async () => {
+  return apiClient.get('/dashboard/stats');
+};
+
+export const getUserStats = async () => {
+  return apiClient.get('/users/stats');
+};
+
+export const getTemplateStatsAPI = async () => {
+  return apiClient.get('/templates-stats');
 };

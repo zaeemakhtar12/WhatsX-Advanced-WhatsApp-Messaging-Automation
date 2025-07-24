@@ -9,17 +9,29 @@ class ApiClient {
   // Get auth headers
   getAuthHeaders() {
     const token = localStorage.getItem('token');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
-    };
+    
+    // Check if token is valid (not null, undefined, or string 'null')
+    const isValidToken = token && token !== 'null' && token !== 'undefined' && token.length > 0;
+    
+    if (isValidToken) {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+    } else {
+      return {
+        'Content-Type': 'application/json'
+      };
+    }
   }
 
   // Generic API call method
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    const headers = this.getAuthHeaders();
+    
     const config = {
-      headers: this.getAuthHeaders(),
+      headers,
       ...options
     };
 
@@ -30,16 +42,16 @@ class ApiClient {
       // Handle authentication errors globally
       if (response.status === 401) {
         this.handleAuthError();
-        throw new Error('Authentication failed');
+        throw new Error('Authentication required');
       }
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        throw new Error(data.error || data.message || 'Request failed');
       }
 
       return data;
     } catch (error) {
-      console.error(`API Error [${endpoint}]:`, error);
+      console.error('API request failed:', error);
       throw error;
     }
   }

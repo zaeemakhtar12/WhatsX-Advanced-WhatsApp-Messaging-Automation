@@ -1,100 +1,136 @@
 const Template = require('../models/templateModel');
 
-// Create a new template (Admin only)
+// Create a new template
 const createTemplate = async (req, res) => {
   try {
-    const { name, category, content, description } = req.body;
-    const createdBy = req.user?.userId;
+    const { name, category, content, description, variables, isPublic } = req.body;
+    const createdBy = req.user?.id;
 
-    if (!createdBy) return res.status(401).json({ error: 'Unauthorized' });
-
-    // Validate required fields
-    if (!name || !category || !content) {
-      return res.status(400).json({ error: 'Name, category, and content are required' });
+    if (!name || !content) {
+      return res.status(400).json({ error: 'Template name and content are required' });
     }
 
-    // Check if template with same name exists
-    const existingTemplate = await Template.findOne({ name: name.trim() });
+    if (!createdBy) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Check if template with same name already exists
+    const existingTemplate = await Template.findOne({ title: name.trim() });
     if (existingTemplate) {
       return res.status(400).json({ error: 'Template with this name already exists' });
     }
 
-    // Extract variables from content
-    const variables = [];
-    const matches = content.match(/\{\{(\w+)\}\}/g);
-    if (matches) {
-      const uniqueVars = [...new Set(matches.map(match => match.replace(/[{}]/g, '')))];
-      variables.push(...uniqueVars);
-    }
+    // Map frontend category to backend enum values
+    const categoryMap = {
+      'Marketing': 'marketing',
+      'Appointment': 'appointment',
+      'Notifications': 'notification',
+      'Greeting': 'greeting',
+      'Reminders': 'reminder',
+      'Support': 'other',
+      'Customer Service': 'other',
+      'Other': 'other'
+    };
+    const validCategory = categoryMap[category] || 'other';
 
     const template = new Template({
-      name: name.trim(),
-      category,
-      content,
+      title: name.trim(),
+      category: validCategory,
+      content: content.trim(),
       description: description?.trim() || '',
-      variables,
-      createdBy,
-      isActive: true,
-      usageCount: 0
+      variables: Array.isArray(variables) ? variables : [],
+      isPublic: isPublic !== false,
+      createdBy
     });
 
-    await template.save();
-    res.status(201).json({ message: 'Template created successfully', template });
+    const savedTemplate = await template.save();
+    res.status(201).json({
+      message: 'Template created successfully',
+      template: {
+        ...savedTemplate.toObject(),
+        name: savedTemplate.title
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Get all templates (Admin gets all, Users get public ones)
+// Get all templates (filtered by access permissions)
 const getTemplates = async (req, res) => {
   try {
-    const userId = req.user?.userId;
-    const userRole = req.user?.role;
-    
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { category, search, page = 1, limit = 20 } = req.query;
-    
-    // Build filter based on user role
-    let filter = { isActive: true };
-    
-    // If not admin, only show public templates or own templates
-    if (userRole !== 'admin') {
-      filter.$or = [
-        { isPublic: true },
-        { createdBy: userId }
-      ];
+    const { category, search, isActive } = req.query;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    
-    if (category) filter.category = category;
+
+    // Convert string userId to ObjectId for proper MongoDB querying
+    const mongoose = require('mongoose');
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    // Build filter
+    const filter = {
+      $or: [
+        { isPublic: true },
+        { createdBy: userObjectId }
+      ]
+    };
+
+    if (category && category !== 'All') {
+      // Map frontend category to backend category
+      const categoryMap = {
+        'Marketing': 'marketing',
+        'Appointment': 'appointment', 
+        'Notifications': 'notification',
+        'Greeting': 'greeting',
+        'Reminders': 'reminder',
+        'Support': 'other',
+        'Customer Service': 'other',
+        'Other': 'other'
+      };
+      filter.category = categoryMap[category] || category.toLowerCase();
+    }
+
     if (search) {
       filter.$and = filter.$and || [];
       filter.$and.push({
         $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
-          { content: { $regex: search, $options: 'i' } }
+          { title: { $regex: search, $options: 'i' } },
+          { content: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
         ]
       });
     }
 
-    const skip = (page - 1) * limit;
     const templates = await Template.find(filter)
-      .populate('createdBy', 'username')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+      .populate('createdBy', 'username email')
+      .sort({ createdAt: -1 });
 
-    const total = await Template.countDocuments(filter);
-
-    res.status(200).json({
-      templates,
-      pagination: {
-        current: parseInt(page),
-        total: Math.ceil(total / limit),
-        count: templates.length
-      }
+    // Add permission info and map fields for frontend compatibility
+    const templatesWithPermissions = templates.map(template => {
+      const templateObj = template.toObject();
+      
+      // Handle case where createdBy might be null (user deleted)
+      const createdById = template.createdBy ? template.createdBy._id.toString() : null;
+      const canEdit = createdById ? createdById === userId.toString() : false;
+      const canDelete = createdById ? createdById === userId.toString() : false;
+      
+      return {
+        ...templateObj,
+        name: templateObj.title, // Map title back to name for frontend
+        canEdit,
+        canDelete,
+        // Ensure createdBy has proper fallback values
+        createdBy: template.createdBy || {
+          _id: null,
+          username: 'Unknown User',
+          email: 'unknown@example.com'
+        }
+      };
     });
+
+    res.status(200).json(templatesWithPermissions);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -104,12 +140,12 @@ const getTemplates = async (req, res) => {
 const getTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
     const userRole = req.user?.role;
     
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    let filter = { _id: id, isActive: true };
+    let filter = { _id: id };
     
     // If not admin, only show public templates or own templates
     if (userRole !== 'admin') {
@@ -136,13 +172,23 @@ const getTemplate = async (req, res) => {
 const updateTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
     const userRole = req.user?.role;
     
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Find template and check permissions
-    const template = await Template.findById(id);
+    // Find template
+    let filter = { _id: id };
+    
+    // If not admin, only allow public templates or own templates
+    if (userRole !== 'admin') {
+      filter.$or = [
+        { isPublic: true },
+        { createdBy: userId }
+      ];
+    }
+
+    const template = await Template.findOne(filter);
     if (!template) {
       return res.status(404).json({ error: 'Template not found' });
     }
@@ -154,15 +200,31 @@ const updateTemplate = async (req, res) => {
 
     const { name, category, content, description, isPublic, isActive } = req.body;
 
-    // Check if new name conflicts with existing templates
-    if (name && name !== template.name) {
+    // Check if new name conflicts with existing templates (using title field)
+    if (name && name !== template.title) {
       const existingTemplate = await Template.findOne({ 
-        name: name.trim(), 
+        title: name.trim(),
         _id: { $ne: id } 
       });
       if (existingTemplate) {
         return res.status(400).json({ error: 'Template with this name already exists' });
       }
+    }
+
+    // Map frontend category to valid model category
+    let validCategory = category;
+    if (category) {
+      const categoryMap = {
+        'Marketing': 'marketing',
+        'Appointment': 'appointment', 
+        'Notifications': 'notification',
+        'Greeting': 'greeting',
+        'Reminders': 'reminder',
+        'Support': 'other',
+        'Customer Service': 'other',
+        'Other': 'other'
+      };
+      validCategory = categoryMap[category] || category.toLowerCase();
     }
 
     // Extract variables from content if content is being updated
@@ -172,28 +234,40 @@ const updateTemplate = async (req, res) => {
       const matches = content.match(/\{\{(\w+)\}\}/g);
       if (matches) {
         const uniqueVars = [...new Set(matches.map(match => match.replace(/[{}]/g, '')))];
-        variables.push(...uniqueVars);
+        variables = uniqueVars.map(varName => ({
+          name: varName,
+          placeholder: `{${varName}}`,
+          description: `Variable for ${varName}`
+        }));
       }
     }
 
-    // Update template
+    // Update template (map name to title)
     const updateData = {
-      ...(name && { name: name.trim() }),
-      ...(category && { category }),
+      ...(name && { title: name.trim() }),
+      ...(validCategory && { category: validCategory }),
       ...(content && { content, variables }),
       ...(description !== undefined && { description: description.trim() }),
       ...(isPublic !== undefined && { isPublic }),
-      ...(isActive !== undefined && { isActive }),
-      updatedAt: new Date()
+      ...(isActive !== undefined && { isActive })
     };
 
     const updatedTemplate = await Template.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
+      id, 
+      updateData, 
+      { new: true, runValidators: true }
     ).populate('createdBy', 'username');
 
-    res.status(200).json({ message: 'Template updated successfully', template: updatedTemplate });
+    // Map response for frontend compatibility
+    const responseTemplate = {
+      ...updatedTemplate.toObject(),
+      name: updatedTemplate.title // Map title back to name
+    };
+
+    res.status(200).json({ 
+      message: 'Template updated successfully', 
+      template: responseTemplate 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -203,7 +277,7 @@ const updateTemplate = async (req, res) => {
 const deleteTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
     const userRole = req.user?.role;
     
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
@@ -219,11 +293,8 @@ const deleteTemplate = async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to delete this template' });
     }
 
-    // Soft delete by setting isActive to false
-    await Template.findByIdAndUpdate(id, { 
-      isActive: false, 
-      deletedAt: new Date() 
-    });
+    // Hard delete - completely remove from database
+    await Template.findByIdAndDelete(id);
 
     res.status(200).json({ message: 'Template deleted successfully' });
   } catch (error) {
@@ -236,13 +307,13 @@ const useTemplate = async (req, res) => {
   try {
     const { id } = req.params;
     const { variables } = req.body;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
     const userRole = req.user?.role;
     
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     // Find template
-    let filter = { _id: id, isActive: true };
+    let filter = { _id: id };
     
     // If not admin, only allow public templates or own templates
     if (userRole !== 'admin') {
@@ -290,10 +361,10 @@ const useTemplate = async (req, res) => {
 // Get template categories
 const getTemplateCategories = async (req, res) => {
   try {
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const categories = await Template.distinct('category', { isActive: true });
+    const categories = await Template.distinct('category');
     res.status(200).json({ categories: categories.sort() });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -303,42 +374,58 @@ const getTemplateCategories = async (req, res) => {
 // Get template statistics (Admin only)
 const getTemplateStats = async (req, res) => {
   try {
-    const userId = req.user?.userId;
     const userRole = req.user?.role;
-    
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Build filter based on user role
-    let filter = { isActive: true };
     if (userRole !== 'admin') {
-      filter.$or = [
-        { isPublic: true },
-        { createdBy: userId }
-      ];
+      return res.status(403).json({ error: 'Access denied. Admin only.' });
     }
 
-    const totalTemplates = await Template.countDocuments(filter);
-    const totalUsage = await Template.aggregate([
-      { $match: filter },
-      { $group: { _id: null, total: { $sum: '$usageCount' } } }
-    ]);
+    // Get template counts
+    const totalTemplates = await Template.countDocuments();
 
+    // Get templates by category
     const categoryStats = await Template.aggregate([
-      { $match: filter },
-      { $group: { _id: '$category', count: { $sum: 1 }, usage: { $sum: '$usageCount' } } },
-      { $sort: { count: -1 } }
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          totalUsage: { $sum: "$usageCount" }
+        }
+      }
     ]);
 
-    const mostUsed = await Template.find(filter)
+    // Get most used templates
+    const topTemplates = await Template.find()
       .sort({ usageCount: -1 })
       .limit(5)
-      .select('name category usageCount');
+      .select('name usageCount category');
+
+    // Get recent templates (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const recentTemplates = await Template.countDocuments({
+      createdAt: { $gte: sevenDaysAgo }
+    });
+
+    // Total usage across all templates
+    const totalUsage = await Template.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalUsage: { $sum: "$usageCount" }
+        }
+      }
+    ]);
 
     res.status(200).json({
-      total: totalTemplates,
-      totalUsage: totalUsage[0]?.total || 0,
-      byCategory: categoryStats,
-      mostUsed
+      totalTemplates,
+      activeTemplates: null, // Removed isActive stats
+      inactiveTemplates: null, // Removed isActive stats
+      recentTemplates,
+      categoryStats,
+      topTemplates,
+      totalUsage: totalUsage[0]?.totalUsage || 0
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

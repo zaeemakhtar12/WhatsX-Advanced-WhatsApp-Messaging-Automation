@@ -6,7 +6,8 @@ const {
     getUserById, 
     updateUser, 
     deleteUser, 
-    updateUserRole 
+    updateUserRole,
+    getUserStats
 } = require('../controllers/userController');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const ValidationMiddleware = require('../middleware/validation');
@@ -19,6 +20,7 @@ router.post('/login', ValidationMiddleware.validateLogin, loginUser);
 
 // Admin-protected routes
 router.get('/users', verifyToken, requireRole('admin'), getAllUsers);
+router.get('/users/stats', verifyToken, requireRole('admin'), getUserStats);
 router.get('/users/:id', verifyToken, requireRole('admin'), getUserById);
 router.put('/users/:id', verifyToken, requireRole('admin'), updateUser);
 router.delete('/users/:id', verifyToken, requireRole('admin'), deleteUser);

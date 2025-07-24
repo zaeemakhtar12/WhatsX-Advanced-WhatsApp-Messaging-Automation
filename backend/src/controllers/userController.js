@@ -40,27 +40,42 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { email, password, role } = req.body; // receive role
+        console.log('Login attempt for:', email, 'with role:', role);
 
         // Step 1: Find user by email and role
         const user = await User.findOne({ email, role });
 
         if (!user) {
+            console.log('User not found or role mismatch for:', email, role);
             return res.status(404).json({ message: 'User not found or role mismatch' });
         }
 
         // Step 2: Compare password with stored hash
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
+            console.log('Invalid password for user:', email);
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Step 3: Generate JWT token
+        // Check if JWT_SECRET is configured
+        if (!process.env.JWT_SECRET) {
+            console.error('JWT_SECRET is not configured!');
+            return res.status(500).json({ message: 'Server configuration error' });
+        }
+
+        // Step 3: Generate JWT token with consistent property names
         const token = jwt.sign(
-            { userId: user._id, email: user.email, role: user.role },
+            { 
+                id: user._id.toString(), // Use 'id' instead of 'userId' for consistency
+                email: user.email, 
+                role: user.role 
+            },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '24h' } // Extended to 24 hours for better UX
         );
 
+        console.log('Login successful for user:', email, 'role:', user.role);
+        
         // Step 4: Send token and role in the response
         res.json({ message: 'Login successful', token, role: user.role });
     } catch (error) {
@@ -168,6 +183,62 @@ const updateUserRole = async (req, res) => {
     }
 };
 
+// Get user statistics (Admin only)
+const getUserStats = async (req, res) => {
+  try {
+    const userRole = req.user?.role;
+
+    if (userRole !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin only.' });
+    }
+
+    // Get user counts by role
+    const totalUsers = await User.countDocuments();
+    const adminUsers = await User.countDocuments({ role: 'admin' });
+    const regularUsers = await User.countDocuments({ role: 'user' });
+
+    // Get recent users (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const recentUsers = await User.countDocuments({
+      createdAt: { $gte: sevenDaysAgo }
+    });
+
+    // Get daily user registrations for chart (last 7 days)
+    const dailyRegistrations = await User.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: sevenDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            day: { $dayOfMonth: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 }
+      }
+    ]);
+
+    res.status(200).json({
+      totalUsers,
+      adminUsers,
+      regularUsers,
+      recentUsers,
+      dailyRegistrations
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -176,4 +247,5 @@ module.exports = {
     updateUser,
     deleteUser,
     updateUserRole,
+    getUserStats
 };

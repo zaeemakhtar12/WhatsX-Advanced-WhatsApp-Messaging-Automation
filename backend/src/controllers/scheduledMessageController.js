@@ -1,58 +1,67 @@
 const ScheduledMessage = require('../models/scheduledMessageModel');
 const Message = require('../models/messageModel');
 
-// Create a new scheduled message
+// Create a scheduled message
 const createScheduledMessage = async (req, res) => {
   try {
     const { 
       recipient, 
       recipientName, 
       message, 
+      scheduledDate, 
       messageType, 
       templateId, 
-      scheduledDate, 
-      scheduledTime, 
       isRecurring, 
       recurringPattern 
     } = req.body;
     
-    const userId = req.user?.userId;
+    console.log('Creating scheduled message with data:', req.body);
+    
+    const userId = req.user?.id; // Changed from userId to id
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Parse the scheduled date
+    const scheduleDateTime = new Date(scheduledDate);
+    const scheduledTime = scheduleDateTime.toTimeString().slice(0, 5); // Extract HH:MM format
 
     const scheduledMessage = new ScheduledMessage({
       userId,
       recipient,
       recipientName,
       message,
+      scheduledDate: scheduleDateTime,
+      scheduledTime: scheduledTime,
       messageType: messageType || 'regular',
-      templateId,
-      scheduledDate: new Date(scheduledDate),
-      scheduledTime,
+      templateId: templateId || null,
       isRecurring: isRecurring || false,
       recurringPattern: isRecurring ? recurringPattern : undefined
     });
 
     await scheduledMessage.save();
-    res.status(201).json({ 
-      message: 'Scheduled message created successfully', 
-      scheduledMessage 
+    
+    console.log('Scheduled message created successfully:', scheduledMessage._id);
+    
+    res.status(201).json({
+      message: 'Message scheduled successfully!',
+      scheduledMessage
     });
   } catch (error) {
+    console.error('Error creating scheduled message:', error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// Get all scheduled messages for a user
+// Get scheduled messages for a user
 const getScheduledMessages = async (req, res) => {
   try {
-    const userId = req.user?.userId;
+    const userId = req.user?.id; // Changed from userId to id
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const scheduledMessages = await ScheduledMessage.find({ userId })
       .populate('templateId', 'name')
       .sort({ scheduledDate: 1 });
-
-    res.status(200).json({ scheduledMessages });
+    
+    res.status(200).json(scheduledMessages);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -62,24 +71,22 @@ const getScheduledMessages = async (req, res) => {
 const updateScheduledMessage = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.userId;
-    
+    const userId = req.user?.id; // Changed from userId to id
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const scheduledMessage = await ScheduledMessage.findOneAndUpdate(
-      { _id: id, userId },
-      req.body,
-      { new: true }
-    ).populate('templateId', 'name');
+    const scheduledMessage = await ScheduledMessage.findOne({ 
+      _id: id, 
+      userId 
+    });
 
     if (!scheduledMessage) {
       return res.status(404).json({ error: 'Scheduled message not found' });
     }
 
-    res.status(200).json({ 
-      message: 'Scheduled message updated successfully', 
-      scheduledMessage 
-    });
+    Object.assign(scheduledMessage, req.body);
+    await scheduledMessage.save();
+    
+    res.status(200).json(scheduledMessage);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -89,19 +96,18 @@ const updateScheduledMessage = async (req, res) => {
 const deleteScheduledMessage = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.userId;
-    
+    const userId = req.user?.id; // Changed from userId to id
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const scheduledMessage = await ScheduledMessage.findOneAndDelete({ 
+    const deletedMessage = await ScheduledMessage.findOneAndDelete({ 
       _id: id, 
       userId 
     });
 
-    if (!scheduledMessage) {
+    if (!deletedMessage) {
       return res.status(404).json({ error: 'Scheduled message not found' });
     }
-
+    
     res.status(200).json({ message: 'Scheduled message deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
