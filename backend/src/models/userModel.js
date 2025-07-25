@@ -19,6 +19,16 @@ const userSchema = mongoose.Schema(
       type: String,
       default: 'user',
     },
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+    otp: {
+      type: String,
+    },
+    otpExpiry: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

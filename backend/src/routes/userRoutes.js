@@ -7,7 +7,10 @@ const {
     updateUser, 
     deleteUser, 
     updateUserRole,
-    getUserStats
+    getUserStats,
+    getProfile,
+    updateProfile,
+    changePassword
 } = require('../controllers/userController');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const ValidationMiddleware = require('../middleware/validation');
@@ -17,6 +20,11 @@ const router = express.Router();
 // Public Routes
 router.post('/register', ValidationMiddleware.validateRegistration, registerUser);
 router.post('/login', ValidationMiddleware.validateLogin, loginUser);
+
+// Profile routes (authenticated user)
+router.get('/profile', verifyToken, getProfile);
+router.patch('/profile', verifyToken, updateProfile);
+router.patch('/profile/password', verifyToken, changePassword);
 
 // Admin-protected routes
 router.get('/users', verifyToken, requireRole('admin'), getAllUsers);

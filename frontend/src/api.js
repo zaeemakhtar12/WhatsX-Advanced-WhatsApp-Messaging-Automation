@@ -120,3 +120,16 @@ export const getUserStats = async () => {
 export const getTemplateStatsAPI = async () => {
   return apiClient.get('/templates-stats');
 };
+
+// User Profile APIs
+export const getProfile = async () => {
+  return apiClient.get('/profile');
+};
+
+export const updateProfile = async (updates) => {
+  return apiClient.patch('/profile', updates);
+};
+
+export const changePassword = async (oldPassword, newPassword) => {
+  return apiClient.patch('/profile/password', { oldPassword, newPassword });
+};

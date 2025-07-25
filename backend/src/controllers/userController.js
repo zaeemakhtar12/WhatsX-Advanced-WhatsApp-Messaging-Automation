@@ -239,6 +239,70 @@ const getUserStats = async (req, res) => {
   }
 };
 
+// Get current user's profile
+const getProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Update current user's profile (email, username)
+const updateProfile = async (req, res) => {
+    try {
+        const { email, username } = req.body;
+        const updates = {};
+        if (email) updates.email = email;
+        if (username) updates.username = username;
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ message: 'No updates provided' });
+        }
+        // Check for unique email if changing
+        if (email) {
+            const existing = await User.findOne({ email, _id: { $ne: req.user.id } });
+            if (existing) {
+                return res.status(400).json({ message: 'Email already exists' });
+            }
+        }
+        const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true, runValidators: true }).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json({ message: 'Profile updated successfully', user });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Change current user's password
+const changePassword = async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ message: 'Old and new password are required' });
+        }
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Old password is incorrect' });
+        }
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -247,5 +311,8 @@ module.exports = {
     updateUser,
     deleteUser,
     updateUserRole,
-    getUserStats
+    getUserStats,
+    getProfile,
+    updateProfile,
+    changePassword
 };
