@@ -10,7 +10,12 @@ const {
     getUserStats,
     getProfile,
     updateProfile,
-    changePassword
+    changePassword,
+    verifyOtp,
+    adminRequest,
+    listAdminRequests,
+    approveAdminRequest,
+    rejectAdminRequest
 } = require('../controllers/userController');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const ValidationMiddleware = require('../middleware/validation');
@@ -20,6 +25,8 @@ const router = express.Router();
 // Public Routes
 router.post('/register', ValidationMiddleware.validateRegistration, registerUser);
 router.post('/login', ValidationMiddleware.validateLogin, loginUser);
+router.post('/verify-otp', verifyOtp);
+router.post('/admin-request', adminRequest);
 
 // Profile routes (authenticated user)
 router.get('/profile', verifyToken, getProfile);
@@ -33,5 +40,9 @@ router.get('/users/:id', verifyToken, requireRole('admin'), getUserById);
 router.put('/users/:id', verifyToken, requireRole('admin'), updateUser);
 router.delete('/users/:id', verifyToken, requireRole('admin'), deleteUser);
 router.patch('/users/:id/role', verifyToken, requireRole('admin'), updateUserRole);
+// Admin requests
+router.get('/admin-requests', verifyToken, requireRole('admin'), listAdminRequests);
+router.post('/admin-requests/:id/approve', verifyToken, requireRole('admin'), approveAdminRequest);
+router.post('/admin-requests/:id/reject', verifyToken, requireRole('admin'), rejectAdminRequest);
 
 module.exports = router;

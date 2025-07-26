@@ -1,10 +1,10 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
+import UnifiedAuthPage from './pages/UnifiedAuthPage';
 import Dashboard from './pages/Dashboard';
+import VerifyOtpPage from './pages/VerifyOtpPage';
+import AdminRequestPage from './pages/AdminRequestPage';
 import { NotificationProvider } from './components/NotificationSystem';
 import apiClient from './utils/apiClient';
 
@@ -67,6 +67,10 @@ function App() {
     setUserRole(null);
   };
 
+  const handleRegister = () => {
+    window.location.href = '/verify-otp';
+  };
+
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-whatsapp-50 to-blue-50 dark:from-dark-bg dark:to-dark-surface flex items-center justify-center">
@@ -88,32 +92,24 @@ function App() {
               element={isAuthenticated ? (
                 <Navigate to="/dashboard" replace />
               ) : (
-                <LandingPage />
+                <UnifiedAuthPage onLogin={handleLogin} onRegister={handleRegister} />
               )} 
             />
             <Route 
-              path="/login" 
-              element={isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <LoginPage onLogin={handleLogin} />
-              )} 
-            />
-            <Route 
-              path="/register" 
-              element={isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <RegisterPage />
-              )} 
+              path="/verify-otp" 
+              element={<VerifyOtpPage />} 
             />
             <Route 
               path="/dashboard" 
               element={isAuthenticated ? (
                 <Dashboard userRole={userRole} onLogout={handleLogout} />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate to="/" replace />
               )} 
+            />
+            <Route 
+              path="/admin-request" 
+              element={<AdminRequestPage />} 
             />
           </Routes>
         </div>

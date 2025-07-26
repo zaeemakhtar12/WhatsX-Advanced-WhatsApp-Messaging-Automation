@@ -32,18 +32,9 @@ function LoginForm({ onLogin }) {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white dark:bg-dark-surface rounded-lg shadow-lg p-6">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Welcome Back
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          Sign in to your account
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {error && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 dark:bg-opacity-20 border border-red-200 dark:border-red-800 rounded-lg">
+        <div className="p-3 bg-red-50 dark:bg-red-900 dark:bg-opacity-20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
         </div>
       )}
@@ -81,7 +72,7 @@ function LoginForm({ onLogin }) {
 
         <div>
           <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Role
+            Login As
           </label>
           <select
             id="role"

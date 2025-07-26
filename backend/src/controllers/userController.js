@@ -3,6 +3,9 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel'); // Import your User model
+const sendEmail = require('../utils/sendEmail');
+const crypto = require('crypto');
+const AdminRequest = require('../models/adminRequestModel');
 
 // Register user
 const registerUser = async (req, res) => {
@@ -19,18 +22,33 @@ const registerUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Step 3: Create a new user
+        // Step 3: Generate OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+        // Step 4: Create a new user
         const newUser = new User({
             username,
             email,
             password: hashedPassword,
             role: role || "user", // Always store a role, default to 'user'
+            verified: false,
+            otp,
+            otpExpiry
         });
 
-        // Step 4: Save the user to the database
+        // Step 5: Save the user to the database
         await newUser.save();
 
-        res.status(201).json({ message: 'User created successfully' });
+        // Step 6: Send OTP email
+        await sendEmail({
+            to: email,
+            subject: 'Your WhatsApp Bulk Messenger Verification Code',
+            text: `Your verification code is: ${otp}`,
+            html: `<p>Your verification code is: <b>${otp}</b></p>`
+        });
+
+        res.status(201).json({ message: 'User created successfully. Please check your email for the verification code.' });
     } catch (error) {
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -48,6 +66,11 @@ const loginUser = async (req, res) => {
         if (!user) {
             console.log('User not found or role mismatch for:', email, role);
             return res.status(404).json({ message: 'User not found or role mismatch' });
+        }
+
+        // Block login if not verified
+        if (!user.verified) {
+            return res.status(403).json({ message: 'Please verify your email before logging in.' });
         }
 
         // Step 2: Compare password with stored hash
@@ -303,6 +326,137 @@ const changePassword = async (req, res) => {
     }
 };
 
+// Verify OTP
+const verifyOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        if (user.verified) {
+            return res.status(400).json({ message: 'User already verified' });
+        }
+        if (!user.otp || !user.otpExpiry || user.otp !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+        if (user.otpExpiry < new Date()) {
+            return res.status(400).json({ message: 'OTP has expired' });
+        }
+        user.verified = true;
+        user.otp = undefined;
+        user.otpExpiry = undefined;
+        await user.save();
+        res.json({ message: 'Email verified successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Handle admin registration request
+const adminRequest = async (req, res) => {
+    try {
+        const { name, email, message } = req.body;
+        
+        // Validate required fields
+        if (!name || !email) {
+            return res.status(400).json({ message: 'Name and email are required.' });
+        }
+
+        // Prevent duplicate requests
+        const existing = await AdminRequest.findOne({ email, status: 'pending' });
+        if (existing) {
+            return res.status(400).json({ message: 'A pending request already exists for this email.' });
+        }
+
+        // Save request
+        const request = new AdminRequest({ name, email, message });
+        await request.save();
+
+        // Try to send email notification (but don't fail if email fails)
+        try {
+            if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
+                await sendEmail({
+                    to: process.env.SENDGRID_SENDER, // Team email
+                    subject: 'New Admin Access Request',
+                    text: `Name: ${name}\nEmail: ${email}\nMessage: ${message || ''}`,
+                    html: `<p><b>Name:</b> ${name}<br/><b>Email:</b> ${email}<br/><b>Message:</b> ${message || ''}</p>`
+                });
+            }
+        } catch (emailError) {
+            console.error('Email sending failed:', emailError);
+            // Don't fail the request if email fails
+        }
+
+        res.status(201).json({ message: 'Request sent to Team WhatsX. Waiting for approval.' });
+    } catch (error) {
+        console.error('Admin request error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// List all admin requests (admin only)
+const listAdminRequests = async (req, res) => {
+    try {
+        const requests = await AdminRequest.find().sort({ createdAt: -1 });
+        res.json(requests);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Approve admin request
+const approveAdminRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const request = await AdminRequest.findById(id);
+        if (!request || request.status !== 'pending') {
+            return res.status(404).json({ message: 'Pending request not found' });
+        }
+        // Find user by email
+        const user = await User.findOne({ email: request.email });
+        if (!user) {
+            return res.status(404).json({ message: 'User with this email not found. Ask them to register first.' });
+        }
+        user.role = 'admin';
+        await user.save();
+        request.status = 'approved';
+        await request.save();
+        // Send approval email
+        await sendEmail({
+            to: request.email,
+            subject: 'Admin Access Approved',
+            text: 'Your request for admin access has been approved. You can now log in as admin.',
+            html: '<p>Your request for admin access has been <b>approved</b>. You can now log in as admin.</p>'
+        });
+        res.json({ message: 'Request approved and user promoted to admin.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Reject admin request
+const rejectAdminRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const request = await AdminRequest.findById(id);
+        if (!request || request.status !== 'pending') {
+            return res.status(404).json({ message: 'Pending request not found' });
+        }
+        // Send rejection email before deleting
+        await sendEmail({
+            to: request.email,
+            subject: 'Admin Access Request Rejected',
+            text: 'Your request for admin access was not approved.',
+            html: '<p>Your request for admin access was <b>not approved</b>.</p>'
+        });
+        await AdminRequest.findByIdAndDelete(id);
+        res.json({ message: 'Request rejected, user notified, and request deleted.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -314,5 +468,10 @@ module.exports = {
     getUserStats,
     getProfile,
     updateProfile,
-    changePassword
+    changePassword,
+    verifyOtp,
+    adminRequest,
+    listAdminRequests,
+    approveAdminRequest,
+    rejectAdminRequest
 };

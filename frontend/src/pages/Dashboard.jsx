@@ -5,6 +5,7 @@ import ScheduleMessage from '../components/ScheduleMessage';
 import MessageLog from '../components/MessageLog';
 import TemplateManagement from '../components/TemplateManagement';
 import { getProfile, updateProfile, changePassword } from '../api';
+import AdminRequestsPage from './AdminRequestsPage';
 
 // Theme Context
 const ThemeContext = createContext();
@@ -381,6 +382,17 @@ function Dashboard({ userRole, onLogout }) {
           </svg>
         ),
         description: 'Manage users' 
+      },
+      {
+        id: 'admin-requests',
+        label: 'Admin Requests',
+        icon: (
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+            <path d="M12 8v4l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+          </svg>
+        ),
+        description: 'Approve admin access'
       }
     ] : []),
     { 
@@ -412,7 +424,7 @@ function Dashboard({ userRole, onLogout }) {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {menuItems
           .filter(item =>
-            userRole === 'admin' ? true : (item.id !== 'template-management' && item.id !== 'user-management')
+            userRole === 'admin' ? true : (item.id !== 'template-management' && item.id !== 'user-management' && item.id !== 'admin-requests')
           )
           .slice(1)
           .map((item) => (
@@ -526,6 +538,8 @@ function Dashboard({ userRole, onLogout }) {
         return <MessageLog />;
       case 'user-management':
         return userRole === 'admin' ? <UserList /> : renderOverview();
+      case 'admin-requests':
+        return userRole === 'admin' ? <AdminRequestsPage /> : renderOverview();
       default:
         return renderOverview();
     }
