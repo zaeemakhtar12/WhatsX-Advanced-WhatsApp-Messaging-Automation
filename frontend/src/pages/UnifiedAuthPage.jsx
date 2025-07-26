@@ -64,50 +64,16 @@ function UnifiedAuthPage({ onLogin, onRegister }) {
         </div>
 
         {/* Footer Links */}
-        <div className="text-center mt-6 space-y-3">
-          {isLogin ? (
-            <>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                Don't have an account?{' '}
-                <button
-                  onClick={() => setIsLogin(false)}
-                  className="text-whatsapp-500 hover:text-whatsapp-600 font-medium"
-                >
-                  Register here
-                </button>
-              </p>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                Want to become an admin?{' '}
-                <Link
-                  to="/admin-request"
-                  className="text-whatsapp-500 hover:text-whatsapp-600 font-medium"
-                >
-                  Request admin access
-                </Link>
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                Already have an account?{' '}
-                <button
-                  onClick={() => setIsLogin(true)}
-                  className="text-whatsapp-500 hover:text-whatsapp-600 font-medium"
-                >
-                  Sign in here
-                </button>
-              </p>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                Want to become an admin?{' '}
-                <Link
-                  to="/admin-request"
-                  className="text-whatsapp-500 hover:text-whatsapp-600 font-medium"
-                >
-                  Request admin access
-                </Link>
-              </p>
-            </>
-          )}
+        <div className="text-center mt-6">
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            Want to become an admin?{' '}
+            <Link
+              to="/admin-request"
+              className="text-whatsapp-500 hover:text-whatsapp-600 font-medium"
+            >
+              Request admin access
+            </Link>
+          </p>
         </div>
       </div>
     </div>

@@ -52,8 +52,15 @@ export const sendBulkMessage = async (contacts, message, templateId = null) => {
   return apiClient.post('/bulk', { contacts, message, templateId });
 };
 
-export const getMessages = async (page = 1, limit = 10, search = '', messageType = '') => {
-  const params = new URLSearchParams({ page, limit, search, messageType });
+export const getMessages = async (page = 1, limit = 10, statusFilter = 'all', typeFilter = 'all', sortBy = 'createdAt', sortOrder = 'desc') => {
+  const params = new URLSearchParams({ 
+    page, 
+    limit, 
+    statusFilter, 
+    typeFilter, 
+    sortBy, 
+    sortOrder 
+  });
   return apiClient.get(`/messages?${params}`);
 };
 

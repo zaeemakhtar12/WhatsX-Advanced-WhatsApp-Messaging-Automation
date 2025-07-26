@@ -83,19 +83,22 @@ const getMessages = async (req, res) => {
     const senderId = req.user?.id;
     if (!senderId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { page = 1, limit = 10, search = '', messageType = '' } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      statusFilter = 'all', 
+      typeFilter = 'all', 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc' 
+    } = req.query;
     
     // Build filter for regular messages
     const messageFilter = { senderId };
-    if (search) {
-      messageFilter.$or = [
-        { recipient: { $regex: search, $options: 'i' } },
-        { message: { $regex: search, $options: 'i' } },
-        { recipientName: { $regex: search, $options: 'i' } }
-      ];
+    if (statusFilter && statusFilter !== 'all') {
+      messageFilter.status = statusFilter;
     }
-    if (messageType) {
-      messageFilter.messageType = messageType;
+    if (typeFilter && typeFilter !== 'all') {
+      messageFilter.messageType = typeFilter;
     }
 
     // Build filter for executed scheduled messages
@@ -103,17 +106,15 @@ const getMessages = async (req, res) => {
       userId: senderId,
       isExecuted: true // Only show executed scheduled messages
     };
-    if (search) {
-      scheduledFilter.$or = [
-        { recipient: { $regex: search, $options: 'i' } },
-        { message: { $regex: search, $options: 'i' } },
-        { recipientName: { $regex: search, $options: 'i' } }
-      ];
+    if (statusFilter && statusFilter !== 'all') {
+      scheduledFilter.status = statusFilter;
     }
-    if (messageType === 'scheduled') {
-      // If filtering by scheduled type, only get scheduled messages
-    } else if (messageType && messageType !== '') {
-      scheduledFilter.messageType = messageType;
+    if (typeFilter && typeFilter !== 'all') {
+      if (typeFilter === 'scheduled') {
+        // If filtering by scheduled type, only get scheduled messages
+      } else {
+        scheduledFilter.messageType = typeFilter;
+      }
     }
 
     // Get both regular messages and executed scheduled messages
@@ -143,25 +144,38 @@ const getMessages = async (req, res) => {
       }))
     ];
 
-    // Sort by creation date (newest first)
-    allMessages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    // Sort by the specified field
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+    allMessages.sort((a, b) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+      
+      // Handle date sorting
+      if (sortBy === 'createdAt') {
+        aValue = new Date(aValue);
+        bValue = new Date(bValue);
+      }
+      
+      if (aValue < bValue) return -1 * sortDirection;
+      if (aValue > bValue) return 1 * sortDirection;
+      return 0;
+    });
 
     // Apply pagination
-    const skip = (page - 1) * limit;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     const paginatedMessages = allMessages.slice(skip, skip + parseInt(limit));
 
     const total = allMessages.length;
+    const totalPages = Math.ceil(total / parseInt(limit));
 
     res.status(200).json({
       messages: paginatedMessages,
-      pagination: {
-        current: parseInt(page),
-        total: Math.ceil(total / limit),
-        count: paginatedMessages.length,
-        totalRecords: total
-      }
+      totalPages,
+      currentPage: parseInt(page),
+      totalRecords: total
     });
   } catch (error) {
+    console.error('getMessages error:', error);
     res.status(500).json({ error: error.message });
   }
 };

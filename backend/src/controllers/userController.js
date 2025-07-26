@@ -356,11 +356,24 @@ const verifyOtp = async (req, res) => {
 // Handle admin registration request
 const adminRequest = async (req, res) => {
     try {
-        const { name, email, message } = req.body;
+        const { 
+            username, 
+            email, 
+            password, 
+            businessName, 
+            businessType, 
+            reasonForAdminAccess, 
+            contactNumber 
+        } = req.body;
         
         // Validate required fields
-        if (!name || !email) {
-            return res.status(400).json({ message: 'Name and email are required.' });
+        if (!username || !email || !password || !businessName || !businessType || !reasonForAdminAccess || !contactNumber) {
+            return res.status(400).json({ message: 'All fields are required.' });
+        }
+
+        // Validate minimum length for reason
+        if (reasonForAdminAccess.length < 10) {
+            return res.status(400).json({ message: 'Reason for admin access must be at least 10 characters long.' });
         }
 
         // Prevent duplicate requests
@@ -370,7 +383,15 @@ const adminRequest = async (req, res) => {
         }
 
         // Save request
-        const request = new AdminRequest({ name, email, message });
+        const request = new AdminRequest({ 
+            username, 
+            email, 
+            password, 
+            businessName, 
+            businessType, 
+            reasonForAdminAccess, 
+            contactNumber 
+        });
         await request.save();
 
         // Try to send email notification (but don't fail if email fails)
@@ -378,9 +399,31 @@ const adminRequest = async (req, res) => {
             if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
                 await sendEmail({
                     to: process.env.SENDGRID_SENDER, // Team email
-                    subject: 'New Admin Access Request',
-                    text: `Name: ${name}\nEmail: ${email}\nMessage: ${message || ''}`,
-                    html: `<p><b>Name:</b> ${name}<br/><b>Email:</b> ${email}<br/><b>Message:</b> ${message || ''}</p>`
+                    subject: 'New Admin Access Request - WhatsX',
+                    text: `
+New Admin Access Request
+
+Full Name: ${username}
+Email: ${email}
+Business Name: ${businessName}
+Business Type: ${businessType}
+Contact Number: ${contactNumber}
+Reason for Admin Access: ${reasonForAdminAccess}
+
+Request submitted at: ${new Date().toLocaleString()}
+                    `,
+                    html: `
+                        <h2>New Admin Access Request - WhatsX</h2>
+                        <p><strong>Full Name:</strong> ${username}</p>
+                        <p><strong>Email:</strong> ${email}</p>
+                        <p><strong>Business Name:</strong> ${businessName}</p>
+                        <p><strong>Business Type:</strong> ${businessType}</p>
+                        <p><strong>Contact Number:</strong> ${contactNumber}</p>
+                        <p><strong>Reason for Admin Access:</strong></p>
+                        <p>${reasonForAdminAccess}</p>
+                        <hr>
+                        <p><em>Request submitted at: ${new Date().toLocaleString()}</em></p>
+                    `
                 });
             }
         } catch (emailError) {
@@ -388,7 +431,7 @@ const adminRequest = async (req, res) => {
             // Don't fail the request if email fails
         }
 
-        res.status(201).json({ message: 'Request sent to Team WhatsX. Waiting for approval.' });
+        res.status(201).json({ message: 'Request submitted successfully. Our team will review your request and contact you within 24-48 hours.' });
     } catch (error) {
         console.error('Admin request error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -413,24 +456,60 @@ const approveAdminRequest = async (req, res) => {
         if (!request || request.status !== 'pending') {
             return res.status(404).json({ message: 'Pending request not found' });
         }
-        // Find user by email
-        const user = await User.findOne({ email: request.email });
-        if (!user) {
-            return res.status(404).json({ message: 'User with this email not found. Ask them to register first.' });
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email: request.email });
+        if (existingUser) {
+            // Update existing user to admin
+            existingUser.role = 'admin';
+            await existingUser.save();
+        } else {
+            // Create new admin user with provided credentials
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(request.password, salt);
+            
+            const newAdminUser = new User({
+                username: request.username,
+                email: request.email,
+                password: hashedPassword,
+                role: 'admin',
+                verified: true // Auto-verify admin users
+            });
+            await newAdminUser.save();
         }
-        user.role = 'admin';
-        await user.save();
+
+        // Update request status
         request.status = 'approved';
         await request.save();
+
         // Send approval email
-        await sendEmail({
-            to: request.email,
-            subject: 'Admin Access Approved',
-            text: 'Your request for admin access has been approved. You can now log in as admin.',
-            html: '<p>Your request for admin access has been <b>approved</b>. You can now log in as admin.</p>'
-        });
+        try {
+            if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
+                await sendEmail({
+                    to: request.email,
+                    subject: 'Admin Access Approved - WhatsX',
+                    text: `Dear ${request.username},\n\nYour request for admin access to WhatsX has been approved! You can now log in with your email and password.\n\nBest regards,\nWhatsX Team`,
+                    html: `
+                        <h2>Admin Access Approved - WhatsX</h2>
+                        <p>Dear ${request.username},</p>
+                        <p>Your request for admin access to WhatsX has been <strong>approved</strong>!</p>
+                        <p>You can now log in with your email and password.</p>
+                        <p><strong>Login Details:</strong></p>
+                        <ul>
+                            <li>Email: ${request.email}</li>
+                            <li>Password: (the password you provided)</li>
+                        </ul>
+                        <p>Best regards,<br>WhatsX Team</p>
+                    `
+                });
+            }
+        } catch (emailError) {
+            console.error('Approval email failed:', emailError);
+        }
+
         res.json({ message: 'Request approved and user promoted to admin.' });
     } catch (error) {
+        console.error('Approve admin request error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -443,16 +522,32 @@ const rejectAdminRequest = async (req, res) => {
         if (!request || request.status !== 'pending') {
             return res.status(404).json({ message: 'Pending request not found' });
         }
+
         // Send rejection email before deleting
-        await sendEmail({
-            to: request.email,
-            subject: 'Admin Access Request Rejected',
-            text: 'Your request for admin access was not approved.',
-            html: '<p>Your request for admin access was <b>not approved</b>.</p>'
-        });
+        try {
+            if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
+                await sendEmail({
+                    to: request.email,
+                    subject: 'Admin Access Request - WhatsX',
+                    text: `Dear ${request.username},\n\nThank you for your interest in WhatsX admin access. After careful review, we regret to inform you that your request has not been approved at this time.\n\nWe appreciate your understanding.\n\nBest regards,\nWhatsX Team`,
+                    html: `
+                        <h2>Admin Access Request - WhatsX</h2>
+                        <p>Dear ${request.username},</p>
+                        <p>Thank you for your interest in WhatsX admin access.</p>
+                        <p>After careful review, we regret to inform you that your request has <strong>not been approved</strong> at this time.</p>
+                        <p>We appreciate your understanding.</p>
+                        <p>Best regards,<br>WhatsX Team</p>
+                    `
+                });
+            }
+        } catch (emailError) {
+            console.error('Rejection email failed:', emailError);
+        }
+
         await AdminRequest.findByIdAndDelete(id);
         res.json({ message: 'Request rejected, user notified, and request deleted.' });
     } catch (error) {
+        console.error('Reject admin request error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };

@@ -16,6 +16,8 @@ function RegisterForm({ role = 'user', onRegister }) {
     try {
       const response = await register({ username, email, password, role });
       if (response.message && response.message.includes('verification code')) {
+        // Store email for OTP verification
+        localStorage.setItem('pendingVerificationEmail', email);
         if (onRegister) onRegister();
       } else {
         setError(response.message || 'Registration failed');

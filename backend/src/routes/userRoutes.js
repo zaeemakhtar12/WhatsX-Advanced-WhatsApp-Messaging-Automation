@@ -28,7 +28,7 @@ router.post('/login', ValidationMiddleware.validateLogin, loginUser);
 router.post('/verify-otp', verifyOtp);
 router.post('/admin-request', adminRequest);
 
-// Profile routes (authenticated user)
+// Profile routes (authenticated user) - MUST come before /users/:id
 router.get('/profile', verifyToken, getProfile);
 router.patch('/profile', verifyToken, updateProfile);
 router.patch('/profile/password', verifyToken, changePassword);
@@ -36,13 +36,14 @@ router.patch('/profile/password', verifyToken, changePassword);
 // Admin-protected routes
 router.get('/users', verifyToken, requireRole('admin'), getAllUsers);
 router.get('/users/stats', verifyToken, requireRole('admin'), getUserStats);
+router.get('/admin-requests', verifyToken, requireRole('admin'), listAdminRequests);
+router.post('/admin-requests/:id/approve', verifyToken, requireRole('admin'), approveAdminRequest);
+router.post('/admin-requests/:id/reject', verifyToken, requireRole('admin'), rejectAdminRequest);
+
+// User management routes (parameterized) - MUST come after specific routes
 router.get('/users/:id', verifyToken, requireRole('admin'), getUserById);
 router.put('/users/:id', verifyToken, requireRole('admin'), updateUser);
 router.delete('/users/:id', verifyToken, requireRole('admin'), deleteUser);
 router.patch('/users/:id/role', verifyToken, requireRole('admin'), updateUserRole);
-// Admin requests
-router.get('/admin-requests', verifyToken, requireRole('admin'), listAdminRequests);
-router.post('/admin-requests/:id/approve', verifyToken, requireRole('admin'), approveAdminRequest);
-router.post('/admin-requests/:id/reject', verifyToken, requireRole('admin'), rejectAdminRequest);
 
 module.exports = router;

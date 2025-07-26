@@ -42,7 +42,7 @@ function App() {
       }
 
       // Verify token with backend
-      await apiClient.get('/users/profile');
+      await apiClient.get('/profile');
       
       const role = localStorage.getItem('role');
       setUserRole(role);
