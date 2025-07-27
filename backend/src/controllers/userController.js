@@ -58,13 +58,11 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { email, password, role } = req.body; // receive role
-        console.log('Login attempt for:', email, 'with role:', role);
 
         // Step 1: Find user by email and role
         const user = await User.findOne({ email, role });
 
         if (!user) {
-            console.log('User not found or role mismatch for:', email, role);
             return res.status(404).json({ message: 'User not found or role mismatch' });
         }
 
@@ -76,7 +74,6 @@ const loginUser = async (req, res) => {
         // Step 2: Compare password with stored hash
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            console.log('Invalid password for user:', email);
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
@@ -96,8 +93,6 @@ const loginUser = async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '24h' } // Extended to 24 hours for better UX
         );
-
-        console.log('Login successful for user:', email, 'role:', user.role);
         
         // Step 4: Send token and role in the response
         res.json({ message: 'Login successful', token, role: user.role });

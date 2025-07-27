@@ -92,6 +92,8 @@ const getMessages = async (req, res) => {
       sortOrder = 'desc' 
     } = req.query;
     
+    console.log(`🔍 Fetching messages for user ${senderId} with filters:`, { statusFilter, typeFilter });
+    
     // Build filter for regular messages
     const messageFilter = { senderId };
     if (statusFilter && statusFilter !== 'all') {
@@ -117,6 +119,9 @@ const getMessages = async (req, res) => {
       }
     }
 
+    console.log('📋 Message filter:', messageFilter);
+    console.log('📋 Scheduled message filter:', scheduledFilter);
+
     // Get both regular messages and executed scheduled messages
     const Message = require('../models/messageModel');
     const ScheduledMessage = require('../models/scheduledMessageModel');
@@ -125,6 +130,9 @@ const getMessages = async (req, res) => {
       Message.find(messageFilter).populate('templateId', 'name'),
       ScheduledMessage.find(scheduledFilter).populate('templateId', 'name')
     ]);
+
+    console.log(`📊 Found ${regularMessages.length} regular messages`);
+    console.log(`📊 Found ${scheduledMessages.length} executed scheduled messages`);
 
     // Combine and format messages
     const allMessages = [
@@ -143,6 +151,8 @@ const getMessages = async (req, res) => {
         createdAt: msg.executedAt || msg.createdAt
       }))
     ];
+
+    console.log(`📊 Total combined messages: ${allMessages.length}`);
 
     // Sort by the specified field
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
@@ -168,6 +178,8 @@ const getMessages = async (req, res) => {
     const total = allMessages.length;
     const totalPages = Math.ceil(total / parseInt(limit));
 
+    console.log(`📄 Returning ${paginatedMessages.length} messages (page ${page} of ${totalPages})`);
+
     res.status(200).json({
       messages: paginatedMessages,
       totalPages,
@@ -175,7 +187,7 @@ const getMessages = async (req, res) => {
       totalRecords: total
     });
   } catch (error) {
-    console.error('getMessages error:', error);
+    console.error('❌ getMessages error:', error);
     res.status(500).json({ error: error.message });
   }
 };

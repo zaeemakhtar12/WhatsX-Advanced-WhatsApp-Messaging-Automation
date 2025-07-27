@@ -15,4 +15,17 @@ router.delete('/scheduled-messages/:id', scheduledMessageController.deleteSchedu
 // Execute scheduled messages (can be called manually or by cron job)
 router.post('/scheduled-messages/execute', scheduledMessageController.executeScheduledMessages);
 
+// Test route to manually trigger execution (for development)
+router.post('/scheduled-messages/test-execute', async (req, res) => {
+  try {
+    const result = await scheduledMessageController.executeScheduledMessages();
+    res.json({ 
+      message: `Executed ${result.executed} scheduled message(s)`,
+      executed: result.executed 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router; 

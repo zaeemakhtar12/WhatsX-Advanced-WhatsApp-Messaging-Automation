@@ -15,6 +15,7 @@ const messageRoutes = require('./routes/messageRoutes');
 const scheduledMessageRoutes = require('./routes/scheduledMessageRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const ValidationMiddleware = require('./middleware/validation');
+const { executeScheduledMessages } = require('./controllers/scheduledMessageController');
 
 const app = express();
 
@@ -125,5 +126,28 @@ const connectDB = async () => {
 // Connect to database
 connectDB();
 
+// Schedule message execution (runs every minute)
+const startScheduler = () => {
+  console.log('🕐 Starting scheduled message executor...');
+  
+  // Execute scheduled messages every minute
+  setInterval(async () => {
+    try {
+      console.log('🔍 Checking for scheduled messages to execute...');
+      const result = await executeScheduledMessages();
+      if (result.executed > 0) {
+        console.log(`✅ Executed ${result.executed} scheduled message(s)`);
+      } else {
+        console.log('📭 No scheduled messages to execute');
+      }
+    } catch (error) {
+      console.error('❌ Error executing scheduled messages:', error.message);
+    }
+  }, 60000); // Run every 60 seconds (1 minute)
+};
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  startScheduler(); // Start the scheduler when server starts
+});

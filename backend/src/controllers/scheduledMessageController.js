@@ -5,8 +5,7 @@ const Message = require('../models/messageModel');
 const createScheduledMessage = async (req, res) => {
   try {
     const { 
-      recipient, 
-      recipientName, 
+      recipients, 
       message, 
       scheduledDate, 
       messageType, 
@@ -15,35 +14,45 @@ const createScheduledMessage = async (req, res) => {
       recurringPattern 
     } = req.body;
     
-    console.log('Creating scheduled message with data:', req.body);
-    
     const userId = req.user?.id; // Changed from userId to id
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({ error: 'At least one recipient is required' });
+    }
+
+    if (!message || !scheduledDate) {
+      return res.status(400).json({ error: 'Message and scheduled date are required' });
+    }
 
     // Parse the scheduled date
     const scheduleDateTime = new Date(scheduledDate);
     const scheduledTime = scheduleDateTime.toTimeString().slice(0, 5); // Extract HH:MM format
 
-    const scheduledMessage = new ScheduledMessage({
-      userId,
-      recipient,
-      recipientName,
-      message,
-      scheduledDate: scheduleDateTime,
-      scheduledTime: scheduledTime,
-      messageType: messageType || 'regular',
-      templateId: templateId || null,
-      isRecurring: isRecurring || false,
-      recurringPattern: isRecurring ? recurringPattern : undefined
-    });
+    const scheduledMessages = [];
 
-    await scheduledMessage.save();
-    
-    console.log('Scheduled message created successfully:', scheduledMessage._id);
+    // Create a scheduled message for each recipient
+    for (const recipient of recipients) {
+      const scheduledMessage = new ScheduledMessage({
+        userId,
+        recipient: recipient.phone,
+        recipientName: recipient.name,
+        message,
+        scheduledDate: scheduleDateTime,
+        scheduledTime: scheduledTime,
+        messageType: messageType || 'regular',
+        templateId: templateId || null,
+        isRecurring: isRecurring || false,
+        recurringPattern: isRecurring ? recurringPattern : undefined
+      });
+
+      await scheduledMessage.save();
+      scheduledMessages.push(scheduledMessage);
+    }
     
     res.status(201).json({
-      message: 'Message scheduled successfully!',
-      scheduledMessage
+      message: `Successfully scheduled ${scheduledMessages.length} message(s)!`,
+      scheduledMessages
     });
   } catch (error) {
     console.error('Error creating scheduled message:', error);
@@ -57,7 +66,10 @@ const getScheduledMessages = async (req, res) => {
     const userId = req.user?.id; // Changed from userId to id
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const scheduledMessages = await ScheduledMessage.find({ userId })
+    const scheduledMessages = await ScheduledMessage.find({ 
+      userId,
+      isExecuted: false // Only show pending (not executed) scheduled messages
+    })
       .populate('templateId', 'name')
       .sort({ scheduledDate: 1 });
     
@@ -71,23 +83,42 @@ const getScheduledMessages = async (req, res) => {
 const updateScheduledMessage = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id; // Changed from userId to id
+    const { recipients, message, scheduledDate, templateId } = req.body;
+    const userId = req.user?.id;
+    
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const scheduledMessage = await ScheduledMessage.findOne({ 
+    // Find the existing scheduled message
+    const existingMessage = await ScheduledMessage.findOne({ 
       _id: id, 
       userId 
     });
 
-    if (!scheduledMessage) {
+    if (!existingMessage) {
       return res.status(404).json({ error: 'Scheduled message not found' });
     }
 
-    Object.assign(scheduledMessage, req.body);
-    await scheduledMessage.save();
+    // Update the message with new data
+    existingMessage.message = message;
+    existingMessage.scheduledDate = new Date(scheduledDate);
+    existingMessage.scheduledTime = new Date(scheduledDate).toTimeString().slice(0, 5);
+    existingMessage.templateId = templateId || null;
+
+    // If recipients are provided, update recipient info
+    if (recipients && recipients.length > 0) {
+      const recipient = recipients[0]; // For single recipient updates
+      existingMessage.recipient = recipient.phone;
+      existingMessage.recipientName = recipient.name;
+    }
+
+    await existingMessage.save();
     
-    res.status(200).json(scheduledMessage);
+    res.status(200).json({
+      message: 'Scheduled message updated successfully',
+      scheduledMessage: existingMessage
+    });
   } catch (error) {
+    console.error('Error updating scheduled message:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -118,17 +149,19 @@ const deleteScheduledMessage = async (req, res) => {
 const executeScheduledMessages = async () => {
   try {
     const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-    const currentDate = now.toISOString().slice(0, 10); // YYYY-MM-DD format
+    console.log(`🔍 Checking for scheduled messages at ${now.toISOString()}`);
 
     const dueMessages = await ScheduledMessage.find({
-      scheduledDate: { $lte: new Date(currentDate) },
-      scheduledTime: { $lte: currentTime },
+      scheduledDate: { $lte: now },
       isExecuted: false
     }).populate('templateId');
 
+    console.log(`📋 Found ${dueMessages.length} due scheduled messages`);
+
     for (const scheduledMsg of dueMessages) {
       try {
+        console.log(`📤 Executing scheduled message for ${scheduledMsg.recipientName} (${scheduledMsg.recipient})`);
+        
         // Create and save the message
         const message = new Message({
           senderId: scheduledMsg.userId,
@@ -141,11 +174,13 @@ const executeScheduledMessages = async () => {
         });
 
         await message.save();
+        console.log(`✅ Created message record: ${message._id}`);
 
         // Mark as executed
         scheduledMsg.isExecuted = true;
         scheduledMsg.executedAt = now;
         await scheduledMsg.save();
+        console.log(`✅ Marked scheduled message as executed: ${scheduledMsg._id}`);
 
         // If recurring, create next instance
         if (scheduledMsg.isRecurring) {
@@ -173,17 +208,16 @@ const executeScheduledMessages = async () => {
           });
 
           await newScheduledMessage.save();
+          console.log(`🔄 Created recurring message for ${nextDate.toISOString()}`);
         }
-
-        console.log(`Executed scheduled message: ${scheduledMsg._id}`);
       } catch (error) {
-        console.error(`Failed to execute scheduled message ${scheduledMsg._id}:`, error);
+        console.error(`❌ Failed to execute scheduled message ${scheduledMsg._id}:`, error);
       }
     }
 
     return { executed: dueMessages.length };
   } catch (error) {
-    console.error('Error executing scheduled messages:', error);
+    console.error('❌ Error executing scheduled messages:', error);
     throw error;
   }
 };
