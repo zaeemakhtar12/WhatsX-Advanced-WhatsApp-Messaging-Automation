@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNotification } from './NotificationSystem';
 import { 
   getTemplates, 
   createTemplate, 
@@ -72,35 +73,7 @@ const ListIcon = ({ className = "w-5 h-5" }) => (
   </svg>
 );
 
-// Modern Notification Component
-function Notification({ message, type = 'success', onClose }) {
-  if (!message) return null;
-  
-  const typeStyles = {
-    success: 'bg-green-500 text-white',
-    error: 'bg-red-500 text-white',
-    info: 'bg-blue-500 text-white'
-  };
-
-  const icons = {
-    success: '✓',
-    error: '✗',
-    info: 'i'
-  };
-
-  return (
-    <div className={`fixed top-6 right-6 ${typeStyles[type]} px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 min-w-[250px] animate-slide-in`}>
-      <span className="font-bold">{icons[type]}</span>
-      <span className="font-medium">{message}</span>
-      <button 
-        onClick={onClose}
-        className="ml-auto text-white hover:text-gray-200 font-bold text-lg leading-none"
-      >
-        ×
-      </button>
-    </div>
-  );
-}
+// Removed local Notification component in favor of global NotificationProvider
 
 function TemplateManagement() {
   const [templates, setTemplates] = useState([]);
@@ -110,7 +83,7 @@ function TemplateManagement() {
   const [viewMode, setViewMode] = useState('grid');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
-  const [notification, setNotification] = useState({ message: '', type: '' });
+  const { showSuccess, showError } = useNotification();
   const [stats, setStats] = useState({});
 
   // Form state
@@ -123,10 +96,11 @@ function TemplateManagement() {
   const categories = [
     { value: 'all', label: 'All Categories', color: 'gray' },
     { value: 'marketing', label: 'Marketing', color: 'blue' },
-    { value: 'promotional', label: 'Promotional', color: 'purple' },
-    { value: 'transactional', label: 'Transactional', color: 'green' },
+    { value: 'appointment', label: 'Appointment', color: 'green' },
     { value: 'notification', label: 'Notification', color: 'yellow' },
-    { value: 'support', label: 'Support', color: 'red' }
+    { value: 'greeting', label: 'Greeting', color: 'purple' },
+    { value: 'reminder', label: 'Reminder', color: 'amber' },
+    { value: 'other', label: 'Other', color: 'red' }
   ];
 
   useEffect(() => {
@@ -134,14 +108,7 @@ function TemplateManagement() {
     fetchStats();
   }, []);
 
-  useEffect(() => {
-    if (notification.message) {
-      const timer = setTimeout(() => {
-        setNotification({ message: '', type: '' });
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification.message]);
+  // Notifications are handled via NotificationProvider
 
   const fetchTemplates = async () => {
     try {
@@ -149,7 +116,7 @@ function TemplateManagement() {
       const response = await getTemplates();
       setTemplates(response || []);
     } catch (error) {
-      showNotification('Error loading templates', 'error');
+      showError('Error loading templates');
     } finally {
       setLoading(false);
     }
@@ -162,10 +129,6 @@ function TemplateManagement() {
     } catch (error) {
       console.error('Error fetching template stats:', error);
     }
-  };
-
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
   };
 
   const resetForm = () => {
@@ -185,16 +148,16 @@ function TemplateManagement() {
       setLoading(true);
       if (editingTemplate) {
         await updateTemplate(editingTemplate._id, formData);
-        showNotification('Template updated successfully!', 'success');
+        showSuccess('Template updated successfully!');
       } else {
         await createTemplate(formData);
-        showNotification('Template created successfully!', 'success');
+        showSuccess('Template created successfully!');
       }
       resetForm();
       fetchTemplates();
       fetchStats();
     } catch (error) {
-      showNotification(error.message || 'Error saving template', 'error');
+      showError(error.message || 'Error saving template');
     } finally {
       setLoading(false);
     }
@@ -214,11 +177,11 @@ function TemplateManagement() {
     if (window.confirm('Are you sure you want to delete this template?')) {
       try {
         await deleteTemplate(templateId);
-        showNotification('Template deleted successfully!', 'success');
+        showSuccess('Template deleted successfully!');
         fetchTemplates();
         fetchStats();
       } catch (error) {
-        showNotification('Error deleting template', 'error');
+        showError('Error deleting template');
       }
     }
   };
@@ -262,7 +225,7 @@ function TemplateManagement() {
           </div>
           <div className="ml-4">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Used This Month</h3>
-            <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.usedThisMonth || 0}</p>
+            <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalUsage || 0}</p>
           </div>
         </div>
       </div>
@@ -275,7 +238,7 @@ function TemplateManagement() {
           </div>
           <div className="ml-4">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Most Popular</h3>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white truncate">{stats.mostPopular || 'N/A'}</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white truncate">{(stats.topTemplates && stats.topTemplates[0]?.name) || 'N/A'}</p>
           </div>
         </div>
       </div>
@@ -584,12 +547,6 @@ function TemplateManagement() {
 
   return (
     <div className="p-6 pl-12 space-y-6">
-      <Notification 
-        message={notification.message} 
-        type={notification.type} 
-        onClose={() => setNotification({ message: '', type: '' })} 
-      />
-      
       {/* Header */}
       <div className="flex items-center gap-3">
         <TemplateIcon className="w-8 h-8" />

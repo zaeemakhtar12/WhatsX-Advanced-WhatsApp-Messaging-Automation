@@ -187,7 +187,7 @@ const updateUserRole = async (req, res) => {
         const user = await User.findByIdAndUpdate(
             id,
             { role },
-            { new: true }
+            { new: true, runValidators: true }
         ).select('-password');
         
         if (!user) {
@@ -377,11 +377,15 @@ const adminRequest = async (req, res) => {
             return res.status(400).json({ message: 'A pending request already exists for this email.' });
         }
 
+        // Hash password before storing request
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         // Save request
         const request = new AdminRequest({ 
             username, 
             email, 
-            password, 
+            password: hashedPassword, 
             businessName, 
             businessType, 
             reasonForAdminAccess, 
@@ -460,13 +464,11 @@ const approveAdminRequest = async (req, res) => {
             await existingUser.save();
         } else {
             // Create new admin user with provided credentials
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(request.password, salt);
-            
+            // Password was hashed at request time; reuse hashed value
             const newAdminUser = new User({
                 username: request.username,
                 email: request.email,
-                password: hashedPassword,
+                password: request.password,
                 role: 'admin',
                 verified: true // Auto-verify admin users
             });

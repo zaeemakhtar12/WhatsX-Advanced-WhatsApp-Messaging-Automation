@@ -129,6 +129,13 @@ function BulkMessagePage() {
   };
 
   const handleTemplateSelect = (template) => {
+    // Toggle selection: clicking same template deselects
+    if (selectedTemplate && selectedTemplate._id === template._id) {
+      setSelectedTemplate(null);
+      setMessage('');
+      showSuccess('Template deselected');
+      return;
+    }
     setSelectedTemplate(template);
     setMessage(template.content);
     showSuccess(`Template "${template.name}" selected`);
@@ -286,6 +293,25 @@ function BulkMessagePage() {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Choose Template (Optional)</h3>
             </div>
             
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedTemplate ? `Selected: ${selectedTemplate.name}` : 'No template selected'}
+              </div>
+              {selectedTemplate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setMessage('');
+                    showSuccess('Template cleared');
+                  }}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Clear template
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {templates.length === 0 ? (
                 <div className="col-span-full text-center py-4">

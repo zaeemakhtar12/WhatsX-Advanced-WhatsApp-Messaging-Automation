@@ -105,28 +105,25 @@ const getTemplates = async (req, res) => {
 
     const templates = await Template.find(filter)
       .populate('createdBy', 'username email')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     // Add permission info and map fields for frontend compatibility
     const templatesWithPermissions = templates.map(template => {
-      const templateObj = template.toObject();
-      
-      // Handle case where createdBy might be null (user deleted)
-      const createdById = template.createdBy ? template.createdBy._id.toString() : null;
+      const createdByObj = template.createdBy || { _id: null, username: 'Unknown User', email: 'unknown@example.com' };
+      const createdById = createdByObj && createdByObj._id ? createdByObj._id.toString() : null;
       const canEdit = createdById ? createdById === userId.toString() : false;
       const canDelete = createdById ? createdById === userId.toString() : false;
-      
+
+      const usageCount = template.usage?.totalUsed || 0;
+
       return {
-        ...templateObj,
-        name: templateObj.title, // Map title back to name for frontend
+        ...template,
+        name: template.title,
+        usageCount,
+        createdBy: createdByObj,
         canEdit,
         canDelete,
-        // Ensure createdBy has proper fallback values
-        createdBy: template.createdBy || {
-          _id: null,
-          username: 'Unknown User',
-          email: 'unknown@example.com'
-        }
       };
     });
 
@@ -330,8 +327,8 @@ const useTemplate = async (req, res) => {
 
     // Increment usage counter
     await Template.findByIdAndUpdate(id, { 
-      $inc: { usageCount: 1 },
-      lastUsedAt: new Date()
+      $inc: { 'usage.totalUsed': 1 },
+      $set: { 'usage.lastUsed': new Date() }
     });
 
     // Replace variables in content
@@ -348,7 +345,7 @@ const useTemplate = async (req, res) => {
       content: processedContent,
       template: {
         id: template._id,
-        name: template.name,
+        name: template.title,
         category: template.category,
         variables: template.variables
       }
@@ -396,9 +393,10 @@ const getTemplateStats = async (req, res) => {
 
     // Get most used templates
     const topTemplates = await Template.find()
-      .sort({ usageCount: -1 })
+      .sort({ 'usage.totalUsed': -1 })
       .limit(5)
-      .select('name usageCount category');
+      .select('title usage category')
+      .lean();
 
     // Get recent templates (last 7 days)
     const sevenDaysAgo = new Date();
@@ -409,23 +407,27 @@ const getTemplateStats = async (req, res) => {
     });
 
     // Total usage across all templates
-    const totalUsage = await Template.aggregate([
+    const totalUsageAgg = await Template.aggregate([
       {
         $group: {
           _id: null,
-          totalUsage: { $sum: "$usageCount" }
+          totalUsage: { $sum: "$usage.totalUsed" }
         }
       }
     ]);
 
     res.status(200).json({
       totalTemplates,
-      activeTemplates: null, // Removed isActive stats
-      inactiveTemplates: null, // Removed isActive stats
+      activeTemplates: null,
+      inactiveTemplates: null,
       recentTemplates,
       categoryStats,
-      topTemplates,
-      totalUsage: totalUsage[0]?.totalUsage || 0
+      topTemplates: topTemplates.map(t => ({
+        name: t.title,
+        usageCount: t.usage?.totalUsed || 0,
+        category: t.category
+      })),
+      totalUsage: totalUsageAgg[0]?.totalUsage || 0
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

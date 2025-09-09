@@ -1,6 +1,7 @@
 // src/components/UserList.js
 import React, { useState, useEffect } from 'react';
 import { getUsers, updateUserRole, deleteUser } from '../api';
+import { useNotification } from './NotificationSystem';
 
 // Icons using Tailwind classes
 const UserIcon = ({ className = "w-5 h-5 text-blue-500" }) => (
@@ -51,35 +52,7 @@ const CloseIcon = ({ className = "w-6 h-6 text-gray-400" }) => (
   </svg>
 );
 
-// Modern Notification Component
-function Notification({ message, type = 'success', onClose }) {
-  if (!message) return null;
-  
-  const typeStyles = {
-    success: 'bg-green-500 text-white',
-    error: 'bg-red-500 text-white',
-    info: 'bg-blue-500 text-white'
-  };
-
-  const icons = {
-    success: '✓',
-    error: '✗',
-    info: 'i'
-  };
-
-  return (
-    <div className={`fixed top-6 right-6 ${typeStyles[type]} px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 min-w-[250px] animate-slide-in`}>
-      <span className="font-bold">{icons[type]}</span>
-      <span className="font-medium">{message}</span>
-      <button 
-        onClick={onClose}
-        className="ml-auto text-white hover:text-gray-200 font-bold text-lg leading-none"
-      >
-        ×
-      </button>
-    </div>
-  );
-}
+// Removed local Notification component in favor of global NotificationProvider
 
 // Modal Component
 function Modal({ isOpen, onClose, title, children }) {
@@ -112,20 +85,13 @@ function UserList() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [editingUser, setEditingUser] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [notification, setNotification] = useState({ message: '', type: '' });
+  const { showSuccess, showError } = useNotification();
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  useEffect(() => {
-    if (notification.message) {
-      const timer = setTimeout(() => {
-        setNotification({ message: '', type: '' });
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification.message]);
+  // Notifications handled globally via provider
 
   const fetchUsers = async () => {
     try {
@@ -133,14 +99,10 @@ function UserList() {
       const response = await getUsers();
       setUsers(response || []);
     } catch (error) {
-      showNotification('Error loading users', 'error');
+      showError('Error loading users');
     } finally {
       setLoading(false);
     }
-  };
-
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
   };
 
   const handleEditUser = (user) => {
@@ -153,12 +115,12 @@ function UserList() {
 
     try {
       await updateUserRole(editingUser._id, editingUser.role);
-      showNotification('User role updated successfully!', 'success');
+      showSuccess('User role updated successfully!');
       setShowEditModal(false);
       setEditingUser(null);
       fetchUsers();
     } catch (error) {
-      showNotification('Error updating user role', 'error');
+      showError('Error updating user role');
     }
   };
 
@@ -166,10 +128,10 @@ function UserList() {
     if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
         await deleteUser(userId);
-        showNotification('User deleted successfully!', 'success');
+        showSuccess('User deleted successfully!');
         fetchUsers();
       } catch (error) {
-        showNotification('Error deleting user', 'error');
+        showError('Error deleting user');
       }
     }
   };
@@ -439,12 +401,6 @@ function UserList() {
 
   return (
     <div className="p-6 pl-12 space-y-6">
-      <Notification 
-        message={notification.message} 
-        type={notification.type} 
-        onClose={() => setNotification({ message: '', type: '' })} 
-      />
-      
       {/* Header */}
       <div className="flex items-center gap-3">
         <UserIcon className="w-8 h-8" />

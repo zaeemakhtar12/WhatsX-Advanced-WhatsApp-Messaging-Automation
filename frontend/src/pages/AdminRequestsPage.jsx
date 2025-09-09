@@ -52,8 +52,8 @@ function AdminRequestsPage() {
               requests.map(req => (
                 <div key={req._id} className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2 bg-gray-50 dark:bg-dark-surface">
                   <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">{req.name} ({req.email})</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">{req.message}</div>
+                                         <div className="font-semibold text-gray-900 dark:text-white">{req.username} ({req.email})</div>
+                     <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">{req.reasonForAdminAccess}</div>
                     <div className="text-xs text-gray-400">Requested: {new Date(req.createdAt).toLocaleString()}</div>
                     <div className="text-xs mt-1">
                       Status: <span className={

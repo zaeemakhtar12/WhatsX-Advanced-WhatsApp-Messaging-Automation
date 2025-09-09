@@ -15,5 +15,6 @@ router.post('/templates', verifyToken, requireRole('admin'), templateController.
 router.put('/templates/:id', verifyToken, requireRole('admin'), templateController.updateTemplate);
 router.delete('/templates/:id', verifyToken, templateController.deleteTemplate); // Allow users to delete their own templates
 router.get('/templates-stats', verifyToken, requireRole('admin'), templateController.getTemplateStats);
+router.get('/templates/stats', verifyToken, requireRole('admin'), templateController.getTemplateStats);
 
 module.exports = router; 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getMessages, deleteMessage } from '../api';
+import { useNotification } from './NotificationSystem';
 
 // Icons using Tailwind classes
 const MessageIcon = ({ className = "w-5 h-5 text-blue-500" }) => (
@@ -48,35 +49,7 @@ const ChevronRightIcon = ({ className = "w-5 h-5" }) => (
   </svg>
 );
 
-// Modern Notification Component
-function Notification({ message, type = 'success', onClose }) {
-  if (!message) return null;
-  
-  const typeStyles = {
-    success: 'bg-green-500 text-white',
-    error: 'bg-red-500 text-white',
-    info: 'bg-blue-500 text-white'
-  };
-
-  const icons = {
-    success: '✓',
-    error: '✗',
-    info: 'i'
-  };
-
-  return (
-    <div className={`fixed top-6 right-6 ${typeStyles[type]} px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 min-w-[250px] animate-slide-in`}>
-      <span className="font-bold">{icons[type]}</span>
-      <span className="font-medium">{message}</span>
-      <button 
-        onClick={onClose}
-        className="ml-auto text-white hover:text-gray-200 font-bold text-lg leading-none"
-      >
-        ×
-      </button>
-    </div>
-  );
-}
+// Removed local Notification component in favor of global NotificationProvider
 
 function MessageLog() {
   const [messages, setMessages] = useState([]);
@@ -86,9 +59,9 @@ function MessageLog() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [notification, setNotification] = useState({ message: '', type: '' });
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
+  const { showSuccess, showError } = useNotification();
 
   const itemsPerPage = 10;
 
@@ -96,14 +69,7 @@ function MessageLog() {
     fetchMessages();
   }, [currentPage, statusFilter, typeFilter, sortBy, sortOrder]);
 
-  useEffect(() => {
-    if (notification.message) {
-      const timer = setTimeout(() => {
-        setNotification({ message: '', type: '' });
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification.message]);
+  // Notifications handled globally via provider
 
   const fetchMessages = async () => {
     try {
@@ -112,24 +78,20 @@ function MessageLog() {
       setMessages(response.messages || []);
       setTotalPages(response.totalPages || 1);
     } catch (error) {
-      showNotification('Error loading messages', 'error');
+      showError('Error loading messages');
     } finally {
       setLoading(false);
     }
-  };
-
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
   };
 
   const handleDelete = async (messageId) => {
     if (window.confirm('Are you sure you want to delete this message?')) {
       try {
         await deleteMessage(messageId);
-        showNotification('Message deleted successfully!', 'success');
+        showSuccess('Message deleted successfully!');
         fetchMessages();
       } catch (error) {
-        showNotification('Error deleting message', 'error');
+        showError('Error deleting message');
       }
     }
   };
@@ -316,7 +278,7 @@ function MessageLog() {
               {filteredMessages.map((message) => (
                 <tr key={message._id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {getMessageTypeIcon(message.type)}
+                    {getMessageTypeIcon(message.messageType || message.type)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
@@ -479,12 +441,6 @@ function MessageLog() {
 
   return (
     <div className="p-6 pl-12 space-y-6">
-      <Notification 
-        message={notification.message} 
-        type={notification.type} 
-        onClose={() => setNotification({ message: '', type: '' })} 
-      />
-      
       {/* Header */}
       <div className="flex items-center gap-3">
         <MessageIcon className="w-8 h-8" />
