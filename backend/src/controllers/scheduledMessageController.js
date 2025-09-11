@@ -1,5 +1,6 @@
 const ScheduledMessage = require('../models/scheduledMessageModel');
 const Message = require('../models/messageModel');
+const { getWhatsAppClient, _waitForAckOnClient } = require('./whatsappController');
 
 // Create a scheduled message
 const createScheduledMessage = async (req, res) => {
@@ -161,8 +162,60 @@ const executeScheduledMessages = async () => {
     for (const scheduledMsg of dueMessages) {
       try {
         console.log(`📤 Executing scheduled message for ${scheduledMsg.recipientName} (${scheduledMsg.recipient})`);
-        
-        // Create and save the message
+
+        // Get active WhatsApp client for this user
+        const client = getWhatsAppClient(String(scheduledMsg.userId));
+        if (!client) {
+          console.warn(`⚠️ WhatsApp not connected for user ${scheduledMsg.userId}. Will retry next interval.`);
+          // Skip without marking executed so it retries later
+          continue;
+        }
+
+        // Clean/format recipient number
+        let cleanNumber = String(scheduledMsg.recipient || '').replace(/\D/g, '');
+        if (cleanNumber.startsWith('0')) cleanNumber = cleanNumber.substring(1);
+        if (!cleanNumber.startsWith('92') && cleanNumber.length === 10) cleanNumber = '92' + cleanNumber;
+        const waId = `${cleanNumber}@c.us`;
+
+        // Verify recipient is on WhatsApp
+        const isRegistered = await client.isRegisteredUser(waId);
+        if (!isRegistered) {
+          console.warn(`❌ Recipient not on WhatsApp: ${scheduledMsg.recipient}`);
+          // Create a failed message log
+          const failedMessage = new Message({
+            senderId: scheduledMsg.userId,
+            recipient: scheduledMsg.recipient,
+            recipientName: scheduledMsg.recipientName,
+            message: scheduledMsg.message,
+            messageType: 'scheduled',
+            templateId: scheduledMsg.templateId?._id,
+            status: 'failed'
+          });
+          await failedMessage.save();
+          // Mark as executed to avoid infinite retries for invalid numbers
+          scheduledMsg.isExecuted = true;
+          scheduledMsg.executedAt = now;
+          await scheduledMsg.save();
+          continue;
+        }
+
+        // Send with simple retry
+        let attempts = 0;
+        const maxAttempts = 3;
+        let sent = false;
+        while (attempts < maxAttempts && !sent) {
+          try {
+            const msg = await client.sendMessage(waId, scheduledMsg.message);
+            await _waitForAckOnClient(client, msg.id._serialized);
+            sent = true;
+          } catch (e) {
+            attempts++;
+            if (attempts >= maxAttempts) throw e;
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+
+        // Create and save the message log as sent
         const message = new Message({
           senderId: scheduledMsg.userId,
           recipient: scheduledMsg.recipient,
@@ -172,9 +225,8 @@ const executeScheduledMessages = async () => {
           templateId: scheduledMsg.templateId?._id,
           status: 'sent'
         });
-
         await message.save();
-        console.log(`✅ Created message record: ${message._id}`);
+        console.log(`✅ Sent and logged message: ${message._id}`);
 
         // Mark as executed
         scheduledMsg.isExecuted = true;

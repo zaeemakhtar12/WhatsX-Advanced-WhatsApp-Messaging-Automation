@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import ContactEntryForm from './ContactEntryForm';
 import ContactCSVUpload from './ContactCSVUpload';
-import { getTemplates, sendBulkMessage } from '../../api';
+import { getTemplates, sendBulkMessage, sendWhatsAppMessage, getWhatsAppStatus } from '../../api';
 import { useNotification } from '../../components/NotificationSystem';
 
 // Enhanced Icons with better styling
@@ -147,25 +147,67 @@ function BulkMessagePage() {
       return;
     }
 
+    // Check WhatsApp connection first
     try {
-      setLoading(true);
-      const response = await sendBulkMessage(
-        contacts,
-        message,
-        selectedTemplate?._id
-      );
+      const statusResponse = await getWhatsAppStatus();
+      if (statusResponse.data.status !== 'connected') {
+        showError('Please connect your WhatsApp first by going to the Connect WhatsApp page');
+        return;
+      }
+    } catch (error) {
+      showError('Failed to check WhatsApp connection status');
+      return;
+    }
 
-      if (response && response.message && response.message.includes('completed')) {
-        showSuccess(`Successfully sent messages to ${contacts.length} recipients!`);
+    setLoading(true);
+    try {
+      // Send messages individually via WhatsApp Web
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const contact of contacts) {
+        try {
+          // Clean phone number before sending
+          let cleanPhone = contact.phone.replace(/\D/g, ''); // Remove all non-digits
+          if (cleanPhone.startsWith('0')) {
+            cleanPhone = cleanPhone.substring(1); // Remove leading 0
+          }
+          if (!cleanPhone.startsWith('92') && cleanPhone.length === 10) {
+            cleanPhone = '92' + cleanPhone; // Add Pakistan country code if missing
+          }
+          
+          await sendWhatsAppMessage({
+            recipient: cleanPhone,
+            message: message
+          });
+          successCount++;
+          
+          // Add small delay between messages to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error(`Failed to send to ${contact.name} (${contact.phone}):`, error);
+          errorCount++;
+          
+          // Show specific error for this contact
+          if (error.response?.data?.message) {
+            showError(`Failed to send to ${contact.name}: ${error.response.data.message}`);
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        showSuccess(`Messages sent successfully to ${successCount} recipients`);
         setContacts([]);
         setMessage('');
         setSelectedTemplate(null);
-      } else {
-        throw new Error('Failed to send messages');
+      }
+      
+      if (errorCount > 0) {
+        showError(`Failed to send to ${errorCount} recipients`);
       }
     } catch (error) {
       console.error('Error sending bulk message:', error);
-      showError('Failed to send bulk messages. Please try again.');
+      showError(error.message || 'Failed to send bulk message');
     } finally {
       setLoading(false);
     }

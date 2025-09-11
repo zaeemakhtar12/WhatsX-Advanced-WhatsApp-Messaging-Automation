@@ -3,20 +3,17 @@ const router = express.Router();
 const scheduledMessageController = require('../controllers/scheduledMessageController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
-// All routes require authentication
-router.use(verifyToken);
-
-// Scheduled message CRUD operations
-router.post('/scheduled-messages', scheduledMessageController.createScheduledMessage);
-router.get('/scheduled-messages', scheduledMessageController.getScheduledMessages);
-router.put('/scheduled-messages/:id', scheduledMessageController.updateScheduledMessage);
-router.delete('/scheduled-messages/:id', scheduledMessageController.deleteScheduledMessage);
+// Scheduled message CRUD operations (authenticated)
+router.post('/scheduled-messages', verifyToken, scheduledMessageController.createScheduledMessage);
+router.get('/scheduled-messages', verifyToken, scheduledMessageController.getScheduledMessages);
+router.put('/scheduled-messages/:id', verifyToken, scheduledMessageController.updateScheduledMessage);
+router.delete('/scheduled-messages/:id', verifyToken, scheduledMessageController.deleteScheduledMessage);
 
 // Execute scheduled messages (can be called manually or by cron job)
-router.post('/scheduled-messages/execute', scheduledMessageController.executeScheduledMessages);
+router.post('/scheduled-messages/execute', verifyToken, scheduledMessageController.executeScheduledMessages);
 
 // Test route to manually trigger execution (for development)
-router.post('/scheduled-messages/test-execute', async (req, res) => {
+router.post('/scheduled-messages/test-execute', verifyToken, async (req, res) => {
   try {
     const result = await scheduledMessageController.executeScheduledMessages();
     res.json({ 

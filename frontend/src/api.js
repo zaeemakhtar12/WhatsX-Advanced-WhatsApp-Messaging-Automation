@@ -103,6 +103,23 @@ export const getUserStats = async () => {
   return apiClient.get('/users/stats');
 };
 
+// WhatsApp Web APIs
+export const startWhatsAppSession = async () => {
+  return apiClient.post('/whatsapp/start-session');
+};
+
+export const getWhatsAppStatus = async () => {
+  return apiClient.get('/whatsapp/status');
+};
+
+export const stopWhatsAppSession = async () => {
+  return apiClient.post('/whatsapp/stop-session');
+};
+
+export const sendWhatsAppMessage = async (messageData) => {
+  return apiClient.post('/whatsapp/send', messageData);
+};
+
 // Removed duplicate getTemplateStatsAPI in favor of getTemplateStats
 
 // User Profile APIs

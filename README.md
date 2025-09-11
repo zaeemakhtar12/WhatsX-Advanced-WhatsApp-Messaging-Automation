@@ -1,7 +1,7 @@
 # WhatsX - WhatsApp Bulk Messaging Platform
 
 ## 📱 Overview
-WhatsX is a comprehensive WhatsApp bulk messaging platform that allows businesses to send personalized messages, manage templates, schedule campaigns, and track message delivery through a modern, intuitive web interface.
+WhatsX is a comprehensive WhatsApp bulk messaging platform that allows users to send personalized messages from their own WhatsApp account, manage templates, schedule campaigns, and track delivery through a modern, intuitive web interface.
 
 ## ✨ Features
 
@@ -14,11 +14,11 @@ WhatsX is a comprehensive WhatsApp bulk messaging platform that allows businesse
 - Automatic user creation upon admin approval
 
 ### 📧 **Messaging Capabilities**
-- Send individual WhatsApp messages
+- Send individual WhatsApp messages via WhatsApp Web automation
 - Bulk messaging with CSV import and manual contact entry
-- Template-based messaging with dynamic variables
-- Message scheduling with date/time selection
-- Message execution tracking and status updates
+- Template-based messaging with dynamic variables and usage tracking
+- Message scheduling with date/time selection (runs every minute)
+- Delivery acknowledgment (waits for WhatsApp ack before marking as sent)
 
 ### 📊 **Admin Features**
 - Comprehensive user management (CRUD operations)
@@ -31,8 +31,8 @@ WhatsX is a comprehensive WhatsApp bulk messaging platform that allows businesse
 ### ⏰ **Scheduling & Automation**
 - Schedule messages for future delivery
 - View and manage scheduled messages
-- Automatic message execution
-- Execution status tracking
+- Automatic execution worker (every 60s) that sends through the active WhatsApp session
+- If WhatsApp is disconnected at execution time, the job is retried later automatically
 
 ### 📋 **Template Management**
 - Create reusable message templates
@@ -51,20 +51,19 @@ WhatsX is a comprehensive WhatsApp bulk messaging platform that allows businesse
 ## 🛠️ Tech Stack
 
 ### Backend
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **MongoDB** - Database with Mongoose ODM
-- **JWT** - Authentication and authorization
-- **bcryptjs** - Password hashing
-- **SendGrid** - Email notifications
-- **dotenv** - Environment configuration
+- **Node.js** (Express.js)
+- **MongoDB + Mongoose**
+- **JWT** auth, **bcryptjs** password hashing
+- **whatsapp-web.js** for WhatsApp Web automation
+- **qrcode / qrcode-terminal** for QR rendering
+- **helmet**, **express-rate-limit**, **cors** for security
+- **SendGrid** for email notifications
+- **dotenv** for env configuration
 
 ### Frontend
-- **React 18** - UI framework
-- **Vite** - Build tool and development server
-- **React Router v6** - Navigation and routing
-- **Tailwind CSS** - Utility-first CSS framework
-- **Axios** - HTTP client for API calls
+- **React 18** + **Vite** + **React Router v6**
+- **Tailwind CSS** with dark mode
+- Centralized `apiClient` and global notification provider
 
 ## 📦 Installation
 
@@ -99,9 +98,11 @@ JWT_SECRET=your-super-secret-jwt-key-here
 SENDGRID_API_KEY=your-sendgrid-api-key
 SENDGRID_SENDER=your-verified-sender@example.com
 
-# Server
+# Server / CORS
 PORT=5000
 NODE_ENV=development
+# Comma-separated list of allowed frontend origins (e.g. Vite dev URL)
+CLIENT_ORIGIN=http://localhost:5173
 ```
 
 ### 3. Frontend Setup
@@ -164,6 +165,12 @@ Access the application at: `http://localhost:5173` (Vite default port)
 - `GET /api/messages` - Get message logs with filtering
 - `DELETE /api/messages/:id` - Delete message
 
+### WhatsApp Web Endpoints
+- `POST /api/whatsapp/start-session` - Start session and get QR (image data URL)
+- `GET /api/whatsapp/status` - Get session status (`not_connected` | `initializing` | `qr_ready` | `connected` | `auth_failed`)
+- `POST /api/whatsapp/stop-session` - Stop session
+- `POST /api/whatsapp/send` - Send WhatsApp message via active session
+
 ### Scheduled Message Endpoints
 - `POST /api/scheduled-messages` - Create scheduled message
 - `GET /api/scheduled-messages` - Get scheduled messages
@@ -197,6 +204,7 @@ FYP2/
 │   │   │   ├── userController.js
 │   │   │   ├── templateController.js
 │   │   │   └── scheduledMessageController.js
+│   │   │   └── whatsappController.js
 │   │   ├── middleware/          # Custom middleware
 │   │   │   ├── authMiddleware.js
 │   │   │   └── validation.js
@@ -211,6 +219,7 @@ FYP2/
 │   │   │   ├── userRoutes.js
 │   │   │   ├── templateRoutes.js
 │   │   │   └── scheduledMessageRoutes.js
+│   │   │   └── whatsappRoutes.js
 │   │   └── app.js               # Main application file
 │   ├── package.json
 │   └── .env
@@ -319,12 +328,18 @@ FYP2/
    npm run dev
    ```
 
-3. **Authentication Issues**
+3. **WhatsApp Web**
+   - If QR shows as text, ensure `qrcode` is installed and backend restarted
+   - If messages say sent but not delivered, reconnect WhatsApp and retry; we wait for ack
+   - Windows PowerShell: use `;` to chain commands (not `&&`)
+   - Ensure `backend/.wwebjs_auth` and `.wwebjs_cache` are not committed
+
+4. **Authentication Issues**
    - Ensure JWT_SECRET is set in backend .env
    - Check token expiration settings
    - Verify email verification flow
 
-4. **Email Notifications Not Working**
+5. **Email Notifications Not Working**
    - Verify SendGrid API key in .env
    - Check sender email verification
    - Ensure proper email templates

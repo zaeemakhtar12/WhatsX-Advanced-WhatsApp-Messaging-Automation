@@ -282,8 +282,8 @@ function UserList() {
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {filteredUsers.map((user) => (
           <div key={user._id} className="card p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
+            <div className="flex items-start justify-between mb-4 gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                   user.role === 'admin' ? 'bg-purple-100 dark:bg-purple-900' : 'bg-blue-100 dark:bg-blue-900'
                 }`}>
@@ -293,8 +293,8 @@ function UserList() {
                     <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   )}
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate max-w-[180px]">
                     {user.name || 'Unknown User'}
                   </h3>
                   {getRoleBadge(user.role)}
@@ -321,7 +321,7 @@ function UserList() {
             <div className="space-y-3">
               <div>
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
-                <p className="text-gray-900 dark:text-white">{user.email}</p>
+                <p className="text-gray-900 dark:text-white break-all text-sm">{user.email}</p>
               </div>
               
               <div className="grid grid-cols-2 gap-4 text-sm">

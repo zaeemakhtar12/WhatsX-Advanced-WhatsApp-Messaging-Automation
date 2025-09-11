@@ -16,6 +16,7 @@ const userRoutes = require('./routes/userRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const scheduledMessageRoutes = require('./routes/scheduledMessageRoutes');
 const templateRoutes = require('./routes/templateRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes');
 const ValidationMiddleware = require('./middleware/validation');
 const { executeScheduledMessages } = require('./controllers/scheduledMessageController');
 
@@ -62,6 +63,7 @@ app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
 app.use('/api', scheduledMessageRoutes);
 app.use('/api', templateRoutes);
+app.use('/api', whatsappRoutes);
 
 // DB Connection
 const connectDB = async () => {

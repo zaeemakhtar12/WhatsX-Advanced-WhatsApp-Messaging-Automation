@@ -103,85 +103,29 @@ const getMessages = async (req, res) => {
       messageFilter.messageType = typeFilter;
     }
 
-    // Build filter for executed scheduled messages
-    const scheduledFilter = { 
-      userId: senderId,
-      isExecuted: true // Only show executed scheduled messages
-    };
-    if (statusFilter && statusFilter !== 'all') {
-      scheduledFilter.status = statusFilter;
-    }
-    if (typeFilter && typeFilter !== 'all') {
-      if (typeFilter === 'scheduled') {
-        // If filtering by scheduled type, only get scheduled messages
-      } else {
-        scheduledFilter.messageType = typeFilter;
-      }
-    }
-
     console.log('📋 Message filter:', messageFilter);
-    console.log('📋 Scheduled message filter:', scheduledFilter);
 
-    // Get both regular messages and executed scheduled messages
+    // Fetch from Message collection only to avoid duplicates
     const Message = require('../models/messageModel');
-    const ScheduledMessage = require('../models/scheduledMessageModel');
 
-    const [regularMessages, scheduledMessages] = await Promise.all([
-      Message.find(messageFilter).populate('templateId', 'name'),
-      ScheduledMessage.find(scheduledFilter).populate('templateId', 'name')
+    // Sort and paginate directly in Mongo where possible
+    const sortObj = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [messages, total] = await Promise.all([
+      Message.find(messageFilter)
+        .populate('templateId', 'name')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Message.countDocuments(messageFilter)
     ]);
 
-    console.log(`📊 Found ${regularMessages.length} regular messages`);
-    console.log(`📊 Found ${scheduledMessages.length} executed scheduled messages`);
-
-    // Combine and format messages
-    const allMessages = [
-      ...regularMessages.map(msg => ({
-        ...msg.toObject(),
-        messageSource: 'regular',
-        createdAt: msg.createdAt
-      })),
-      ...scheduledMessages.map(msg => ({
-        ...msg.toObject(),
-        _id: msg._id,
-        senderId: msg.userId,
-        messageSource: 'scheduled',
-        messageType: 'scheduled',
-        status: 'sent',
-        createdAt: msg.executedAt || msg.createdAt
-      }))
-    ];
-
-    console.log(`📊 Total combined messages: ${allMessages.length}`);
-
-    // Sort by the specified field
-    const sortDirection = sortOrder === 'asc' ? 1 : -1;
-    allMessages.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-      
-      // Handle date sorting
-      if (sortBy === 'createdAt') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      }
-      
-      if (aValue < bValue) return -1 * sortDirection;
-      if (aValue > bValue) return 1 * sortDirection;
-      return 0;
-    });
-
-    // Apply pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const paginatedMessages = allMessages.slice(skip, skip + parseInt(limit));
-
-    const total = allMessages.length;
     const totalPages = Math.ceil(total / parseInt(limit));
-
-    console.log(`📄 Returning ${paginatedMessages.length} messages (page ${page} of ${totalPages})`);
+    console.log(`📄 Returning ${messages.length} messages (page ${page} of ${totalPages})`);
 
     res.status(200).json({
-      messages: paginatedMessages,
+      messages,
       totalPages,
       currentPage: parseInt(page),
       totalRecords: total

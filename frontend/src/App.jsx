@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import UnifiedAuthPage from './pages/UnifiedAuthPage';
+import WhatsAppConnectPage from './pages/WhatsAppConnectPage';
 import Dashboard from './pages/Dashboard';
 import VerifyOtpPage from './pages/VerifyOtpPage';
 import AdminRequestPage from './pages/AdminRequestPage';
@@ -110,6 +111,14 @@ function App() {
             <Route 
               path="/admin-request" 
               element={<AdminRequestPage />} 
+            />
+            <Route 
+              path="/whatsapp-connect" 
+              element={isAuthenticated ? (
+                <WhatsAppConnectPage />
+              ) : (
+                <Navigate to="/" replace />
+              )} 
             />
           </Routes>
         </div>
