@@ -74,7 +74,7 @@ WhatsX is a comprehensive WhatsApp bulk messaging platform that allows users to 
 
 ### 1. Clone Repository
 ```bash
-git clone <repository-url>
+git clone <https://github.com/zaeemakhtar12/WhatsX-Advanced-WhatsApp-Messaging-Automation.git>
 cd FYP2
 ```
 
@@ -391,7 +391,7 @@ For support and questions:
 - Create an issue in the repository
 - Check existing documentation
 - Review troubleshooting section
-- Contact: [Your Contact Information]
+- Contact: mzaeemakhtar12@gmail.com
 
 ---
 
