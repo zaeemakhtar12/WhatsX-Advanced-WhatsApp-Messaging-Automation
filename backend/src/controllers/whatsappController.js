@@ -198,7 +198,37 @@ exports.stopWhatsAppSession = async (req, res) => {
 
     const session = userSessions.get(userId);
     if (session && session.client) {
-      await session.client.destroy();
+      // Destroy the client first to release file locks on Windows
+      try { await session.client.destroy(); } catch (e) { /* ignore */ }
+
+      // Small delay to ensure Chromium releases file handles
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Remove persisted auth folder (with retries to avoid EBUSY on Windows)
+      const fs = require('fs');
+      const path = require('path');
+      const authDir = path.join(process.cwd(), '.wwebjs_auth', `session-user-${userId}`);
+
+      const tryRemoveDirWithRetries = async (targetPath, retries = 5, delayMs = 300) => {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+          try {
+            if (fs.existsSync(targetPath)) {
+              fs.rmSync(targetPath, { recursive: true, force: true });
+            }
+            return true;
+          } catch (err) {
+            const isBusy = /EBUSY|EPERM|ENOTEMPTY/i.test(String(err && err.code || err.message));
+            if (attempt === retries || !isBusy) {
+              console.warn(`Failed to clear auth directory (attempt ${attempt}/${retries}):`, err.message);
+              return false;
+            }
+            await new Promise(r => setTimeout(r, delayMs));
+          }
+        }
+      };
+
+      await tryRemoveDirWithRetries(authDir);
+
       userSessions.delete(userId);
     }
 

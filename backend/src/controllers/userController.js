@@ -6,6 +6,12 @@ const User = require('../models/userModel'); // Import your User model
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
 const AdminRequest = require('../models/adminRequestModel');
+const { 
+    getVerificationEmailTemplate, 
+    getAdminRequestNotificationTemplate, 
+    getAdminApprovalTemplate, 
+    getAdminRejectionTemplate 
+} = require('../templates/emailTemplates');
 
 // Register user
 const registerUser = async (req, res) => {
@@ -40,12 +46,12 @@ const registerUser = async (req, res) => {
         // Step 5: Save the user to the database
         await newUser.save();
 
-        // Step 6: Send OTP email
+        // Step 6: Send OTP email with modern template
         await sendEmail({
             to: email,
-            subject: 'Your WhatsApp Bulk Messenger Verification Code',
-            text: `Your verification code is: ${otp}`,
-            html: `<p>Your verification code is: <b>${otp}</b></p>`
+            subject: '🔐 Verify Your WhatsX Account - Complete Registration',
+            text: `Your WhatsX verification code is: ${otp}. This code expires in 10 minutes.`,
+            html: getVerificationEmailTemplate(otp, username)
         });
 
         res.status(201).json({ message: 'User created successfully. Please check your email for the verification code.' });
@@ -398,7 +404,7 @@ const adminRequest = async (req, res) => {
             if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
                 await sendEmail({
                     to: process.env.SENDGRID_SENDER, // Team email
-                    subject: 'New Admin Access Request - WhatsX',
+                    subject: '🔔 New Admin Access Request - WhatsX',
                     text: `
 New Admin Access Request
 
@@ -411,18 +417,7 @@ Reason for Admin Access: ${reasonForAdminAccess}
 
 Request submitted at: ${new Date().toLocaleString()}
                     `,
-                    html: `
-                        <h2>New Admin Access Request - WhatsX</h2>
-                        <p><strong>Full Name:</strong> ${username}</p>
-                        <p><strong>Email:</strong> ${email}</p>
-                        <p><strong>Business Name:</strong> ${businessName}</p>
-                        <p><strong>Business Type:</strong> ${businessType}</p>
-                        <p><strong>Contact Number:</strong> ${contactNumber}</p>
-                        <p><strong>Reason for Admin Access:</strong></p>
-                        <p>${reasonForAdminAccess}</p>
-                        <hr>
-                        <p><em>Request submitted at: ${new Date().toLocaleString()}</em></p>
-                    `
+                    html: getAdminRequestNotificationTemplate(username, email, businessName, businessType, contactNumber, reasonForAdminAccess)
                 });
             }
         } catch (emailError) {
@@ -484,20 +479,9 @@ const approveAdminRequest = async (req, res) => {
             if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
                 await sendEmail({
                     to: request.email,
-                    subject: 'Admin Access Approved - WhatsX',
+                    subject: '✅ Admin Access Approved - WhatsX',
                     text: `Dear ${request.username},\n\nYour request for admin access to WhatsX has been approved! You can now log in with your email and password.\n\nBest regards,\nWhatsX Team`,
-                    html: `
-                        <h2>Admin Access Approved - WhatsX</h2>
-                        <p>Dear ${request.username},</p>
-                        <p>Your request for admin access to WhatsX has been <strong>approved</strong>!</p>
-                        <p>You can now log in with your email and password.</p>
-                        <p><strong>Login Details:</strong></p>
-                        <ul>
-                            <li>Email: ${request.email}</li>
-                            <li>Password: (the password you provided)</li>
-                        </ul>
-                        <p>Best regards,<br>WhatsX Team</p>
-                    `
+                    html: getAdminApprovalTemplate(request.username, request.email)
                 });
             }
         } catch (emailError) {
@@ -525,16 +509,9 @@ const rejectAdminRequest = async (req, res) => {
             if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
                 await sendEmail({
                     to: request.email,
-                    subject: 'Admin Access Request - WhatsX',
+                    subject: '📋 Admin Access Request - WhatsX',
                     text: `Dear ${request.username},\n\nThank you for your interest in WhatsX admin access. After careful review, we regret to inform you that your request has not been approved at this time.\n\nWe appreciate your understanding.\n\nBest regards,\nWhatsX Team`,
-                    html: `
-                        <h2>Admin Access Request - WhatsX</h2>
-                        <p>Dear ${request.username},</p>
-                        <p>Thank you for your interest in WhatsX admin access.</p>
-                        <p>After careful review, we regret to inform you that your request has <strong>not been approved</strong> at this time.</p>
-                        <p>We appreciate your understanding.</p>
-                        <p>Best regards,<br>WhatsX Team</p>
-                    `
+                    html: getAdminRejectionTemplate(request.username)
                 });
             }
         } catch (emailError) {

@@ -135,6 +135,7 @@
   }
 }
 
+
 @keyframes shimmer {
   0% {
     background-position: -200px 0;
@@ -169,6 +170,8 @@
   background-size: 200px 100%;
   animation: shimmer 1.5s infinite;
 }
+
+ 
 
 /* Enhanced hover effects */
 .hover-glow:hover {

@@ -72,6 +72,9 @@ function App() {
     window.location.href = '/verify-otp';
   };
 
+  
+
+  // Show loading while checking authentication
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-whatsapp-50 to-blue-50 dark:from-dark-bg dark:to-dark-surface flex items-center justify-center">
