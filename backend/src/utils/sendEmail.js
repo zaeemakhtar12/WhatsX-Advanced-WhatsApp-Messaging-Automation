@@ -1,19 +1,17 @@
 const sgMail = require('@sendgrid/mail');
+const { SENDGRID_API_KEY, SENDGRID_SENDER } = process.env;
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const SENDGRID_SENDER = process.env.SENDGRID_SENDER;
-
-sgMail.setApiKey(SENDGRID_API_KEY);
+if (SENDGRID_API_KEY) sgMail.setApiKey(SENDGRID_API_KEY);
 
 async function sendEmail({ to, subject, text, html }) {
-  const msg = {
-    to,
-    from: SENDGRID_SENDER,
-    subject,
-    text,
-    html,
-  };
-  await sgMail.send(msg);
+  if (!SENDGRID_API_KEY || !SENDGRID_SENDER) {
+    console.warn('SendGrid not configured'); return;
+  }
+  try {
+    await sgMail.send({ to, from: SENDGRID_SENDER, subject, text, html });
+  } catch (err) {
+    console.error('SendGrid error:', err?.response?.body || err.message);
+    // do not rethrow – allow registration to continue
+  }
 }
-
-module.exports = sendEmail; 
+module.exports = sendEmail;
