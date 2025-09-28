@@ -17,9 +17,9 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: RESEND_API_KEY
-        sync: false
+        value: 're_cXtAsn4c_MC141Qjyg3YRu3A98wJuRbar
       - key: RESEND_FROM
-        value: 'WhatsX <onboarding@resend.dev>'
+        value: 'WhatsX <noreply@resend.dev>'
       - key: CLIENT_ORIGIN
         sync: false
 

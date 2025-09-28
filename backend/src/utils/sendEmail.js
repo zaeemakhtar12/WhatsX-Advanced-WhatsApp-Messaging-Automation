@@ -27,6 +27,7 @@ async function sendEmail({ to, subject, text, html }) {
     });
     
     console.log('Email sent successfully:', result.data?.id);
+    console.log('Full result:', JSON.stringify(result, null, 2));
     return result;
   } catch (err) {
     console.error('Email sending error:', err.message);
