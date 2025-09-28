@@ -408,11 +408,10 @@ const adminRequest = async (req, res) => {
 
         // Try to send email notification (but don't fail if email fails)
         try {
-            if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
-                await sendEmail({
-                    to: process.env.SENDGRID_SENDER, // Team email
-                    subject: '🔔 New Admin Access Request - WhatsX',
-                    text: `
+            await sendEmail({
+                to: process.env.SMTP_FROM || process.env.SMTP_USER, // Team email
+                subject: '🔔 New Admin Access Request - WhatsX',
+                text: `
 New Admin Access Request
 
 Full Name: ${username}
@@ -424,9 +423,8 @@ Reason for Admin Access: ${reasonForAdminAccess}
 
 Request submitted at: ${new Date().toLocaleString()}
                     `,
-                    html: getAdminRequestNotificationTemplate(username, email, businessName, businessType, contactNumber, reasonForAdminAccess)
-                });
-            }
+                html: getAdminRequestNotificationTemplate(username, email, businessName, businessType, contactNumber, reasonForAdminAccess)
+            });
         } catch (emailError) {
             console.error('Email sending failed:', emailError);
             // Don't fail the request if email fails
@@ -483,14 +481,12 @@ const approveAdminRequest = async (req, res) => {
 
         // Send approval email
         try {
-            if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
-                await sendEmail({
-                    to: request.email,
-                    subject: '✅ Admin Access Approved - WhatsX',
-                    text: `Dear ${request.username},\n\nYour request for admin access to WhatsX has been approved! You can now log in with your email and password.\n\nBest regards,\nWhatsX Team`,
-                    html: getAdminApprovalTemplate(request.username, request.email)
-                });
-            }
+            await sendEmail({
+                to: request.email,
+                subject: '✅ Admin Access Approved - WhatsX',
+                text: `Dear ${request.username},\n\nYour request for admin access to WhatsX has been approved! You can now log in with your email and password.\n\nBest regards,\nWhatsX Team`,
+                html: getAdminApprovalTemplate(request.username, request.email)
+            });
         } catch (emailError) {
             console.error('Approval email failed:', emailError);
         }
@@ -513,14 +509,12 @@ const rejectAdminRequest = async (req, res) => {
 
         // Send rejection email before deleting
         try {
-            if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_SENDER) {
-                await sendEmail({
-                    to: request.email,
-                    subject: '📋 Admin Access Request - WhatsX',
-                    text: `Dear ${request.username},\n\nThank you for your interest in WhatsX admin access. After careful review, we regret to inform you that your request has not been approved at this time.\n\nWe appreciate your understanding.\n\nBest regards,\nWhatsX Team`,
-                    html: getAdminRejectionTemplate(request.username)
-                });
-            }
+            await sendEmail({
+                to: request.email,
+                subject: '📋 Admin Access Request - WhatsX',
+                text: `Dear ${request.username},\n\nThank you for your interest in WhatsX admin access. After careful review, we regret to inform you that your request has not been approved at this time.\n\nWe appreciate your understanding.\n\nBest regards,\nWhatsX Team`,
+                html: getAdminRejectionTemplate(request.username)
+            });
         } catch (emailError) {
             console.error('Rejection email failed:', emailError);
         }

@@ -16,9 +16,17 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
-      - key: SENDGRID_API_KEY
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 465
+      - key: SMTP_SECURE
+        value: 'true'
+      - key: SMTP_USER
         sync: false
-      - key: SENDGRID_SENDER
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
         sync: false
       - key: CLIENT_ORIGIN
         sync: false

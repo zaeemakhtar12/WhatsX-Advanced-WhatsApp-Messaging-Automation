@@ -1,14 +1,22 @@
 const nodemailer = require('nodemailer');
-const { SENDGRID_API_KEY, SENDGRID_SENDER } = process.env;
 
-// Create transporter for Gmail SMTP (explicit host/port with timeouts)
+const {
+  SMTP_HOST = 'smtp.gmail.com',
+  SMTP_PORT = '465',
+  SMTP_SECURE = 'true',
+  SMTP_USER,
+  SMTP_PASS,
+  SMTP_FROM
+} = process.env;
+
+// Create transporter for SMTP (defaults configured for Gmail)
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // use TLS
+  host: SMTP_HOST,
+  port: Number(SMTP_PORT),
+  secure: String(SMTP_SECURE).toLowerCase() === 'true',
   auth: {
-    user: SENDGRID_SENDER, // Gmail address
-    pass: SENDGRID_API_KEY // Gmail App Password
+    user: SMTP_USER,
+    pass: SMTP_PASS
   },
   connectionTimeout: 15_000,
   greetingTimeout: 10_000,
@@ -16,8 +24,8 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendEmail({ to, subject, text, html }) {
-  if (!SENDGRID_API_KEY || !SENDGRID_SENDER) {
-    console.warn('Email service not configured');
+  if (!SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
+    console.warn('SMTP not configured');
     throw new Error('Email service not configured');
   }
   
@@ -27,7 +35,7 @@ async function sendEmail({ to, subject, text, html }) {
     await transporter.verify();
     const result = await transporter.sendMail({ 
       to, 
-      from: SENDGRID_SENDER, 
+      from: SMTP_FROM, 
       subject, 
       text, 
       html 
