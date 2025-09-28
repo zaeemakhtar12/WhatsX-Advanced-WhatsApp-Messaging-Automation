@@ -24,9 +24,14 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendEmail({ to, subject, text, html }) {
-  if (!SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
-    console.warn('SMTP not configured');
-    throw new Error('Email service not configured');
+  const missing = [
+    ['SMTP_USER', SMTP_USER],
+    ['SMTP_PASS', SMTP_PASS],
+    ['SMTP_FROM', SMTP_FROM]
+  ].filter(([_, v]) => !v).map(([k]) => k);
+  if (missing.length) {
+    console.warn(`SMTP not configured. Missing: ${missing.join(', ')}`);
+    throw new Error(`Email service not configured: missing ${missing.join(', ')}`);
   }
   
   try {
