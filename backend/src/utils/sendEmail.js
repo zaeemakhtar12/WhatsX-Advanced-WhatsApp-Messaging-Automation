@@ -18,6 +18,7 @@ const transporter = nodemailer.createTransport({
     user: SMTP_USER,
     pass: SMTP_PASS
   },
+  requireTLS: true,
   connectionTimeout: 30_000, // Increased timeout
   greetingTimeout: 15_000,   // Increased timeout
   socketTimeout: 30_000,     // Increased timeout
