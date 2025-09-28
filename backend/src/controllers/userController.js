@@ -43,16 +43,23 @@ const registerUser = async (req, res) => {
             otpExpiry
         });
 
-        // Step 5: Save the user to the database
-        await newUser.save();
+        // Step 5: Try to send OTP email first (before saving user)
+        try {
+            await sendEmail({
+                to: email,
+                subject: '🔐 Verify Your WhatsX Account - Complete Registration',
+                text: `Your WhatsX verification code is: ${otp}. This code expires in 10 minutes.`,
+                html: getVerificationEmailTemplate(otp, username)
+            });
+        } catch (emailError) {
+            console.error('Failed to send verification email:', emailError);
+            return res.status(500).json({ 
+                error: 'Failed to send verification email. Please check your email address and try again.' 
+            });
+        }
 
-        // Step 6: Send OTP email with modern template
-        await sendEmail({
-            to: email,
-            subject: '🔐 Verify Your WhatsX Account - Complete Registration',
-            text: `Your WhatsX verification code is: ${otp}. This code expires in 10 minutes.`,
-            html: getVerificationEmailTemplate(otp, username)
-        });
+        // Step 6: Save the user to the database only after email is sent successfully
+        await newUser.save();
 
         res.status(201).json({ message: 'User created successfully. Please check your email for the verification code.' });
     } catch (error) {
