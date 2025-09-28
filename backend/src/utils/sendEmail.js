@@ -9,20 +9,26 @@ const {
   SMTP_FROM
 } = process.env;
 
-// Create transporter for Gmail SMTP
+// Create transporter for Gmail SMTP with optimized settings for Render
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: Number(SMTP_PORT),
-  secure: String(SMTP_SECURE).toLowerCase() === 'true',
+  secure: false, // Always use STARTTLS for port 587
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS
   },
-  connectionTimeout: 30_000,
-  greetingTimeout: 15_000,
-  socketTimeout: 30_000,
+  connectionTimeout: 60_000, // Increased timeout
+  greetingTimeout: 30_000,  // Increased timeout
+  socketTimeout: 60_000,    // Increased timeout
+  pool: true,               // Use connection pooling
+  maxConnections: 1,        // Limit connections
+  maxMessages: 3,           // Limit messages per connection
+  rateDelta: 20000,         // Rate limiting
+  rateLimit: 5,             // Max 5 emails per rateDelta
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    ciphers: 'SSLv3'
   }
 });
 
