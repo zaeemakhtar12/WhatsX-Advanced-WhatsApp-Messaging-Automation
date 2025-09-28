@@ -2,7 +2,7 @@ const nodemailer = require('nodemailer');
 const { SENDGRID_API_KEY, SENDGRID_SENDER } = process.env;
 
 // Create transporter for Gmail SMTP
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: SENDGRID_SENDER, // Your Gmail address
