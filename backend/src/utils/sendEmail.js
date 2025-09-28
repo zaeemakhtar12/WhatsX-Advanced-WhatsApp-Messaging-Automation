@@ -18,13 +18,17 @@ const transporter = nodemailer.createTransport({
     user: SMTP_USER,
     pass: SMTP_PASS
   },
-  requireTLS: true,
-  connectionTimeout: 30_000, // Increased timeout
-  greetingTimeout: 15_000,   // Increased timeout
-  socketTimeout: 30_000,     // Increased timeout
+  requireTLS: false, // Try without requiring TLS first
+  connectionTimeout: 60_000, // Even longer timeout
+  greetingTimeout: 30_000,   // Longer greeting timeout
+  socketTimeout: 60_000,     // Longer socket timeout
   tls: {
-    rejectUnauthorized: false // Allow self-signed certificates
-  }
+    rejectUnauthorized: false, // Allow self-signed certificates
+    ciphers: 'SSLv3' // Try different cipher
+  },
+  pool: true, // Use connection pooling
+  maxConnections: 1,
+  maxMessages: 1
 });
 
 async function sendEmail({ to, subject, text, html }) {
@@ -42,12 +46,34 @@ async function sendEmail({ to, subject, text, html }) {
     console.log(`Attempting to send email to: ${to}`);
     console.log(`Using SMTP: ${SMTP_HOST}:${SMTP_PORT}, user: ${SMTP_USER}`);
     
-    // Verify connection for clearer errors
-    console.log('Verifying SMTP connection...');
-    await transporter.verify();
-    console.log('SMTP connection verified successfully');
+    // Try alternative Gmail SMTP settings if primary fails
+    let currentTransporter = transporter;
     
-    const result = await transporter.sendMail({ 
+    try {
+      console.log('Verifying SMTP connection...');
+      await currentTransporter.verify();
+      console.log('SMTP connection verified successfully');
+    } catch (verifyErr) {
+      console.log('Primary SMTP failed, trying alternative Gmail settings...');
+      
+      // Try alternative Gmail SMTP configuration
+      const altTransporter = nodemailer.createTransport({
+        service: 'gmail', // Use service instead of host/port
+        auth: {
+          user: SMTP_USER,
+          pass: SMTP_PASS
+        },
+        connectionTimeout: 30_000,
+        greetingTimeout: 15_000,
+        socketTimeout: 30_000
+      });
+      
+      await altTransporter.verify();
+      console.log('Alternative SMTP connection verified successfully');
+      currentTransporter = altTransporter;
+    }
+    
+    const result = await currentTransporter.sendMail({ 
       to, 
       from: SMTP_FROM, 
       subject, 
