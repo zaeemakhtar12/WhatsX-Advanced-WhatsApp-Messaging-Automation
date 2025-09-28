@@ -1,33 +1,61 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
 const {
-  RESEND_API_KEY,
-  RESEND_FROM = 'WhatsX <onboarding@resend.dev>'
+  SMTP_HOST = 'smtp.gmail.com',
+  SMTP_PORT = '587',
+  SMTP_SECURE = 'false',
+  SMTP_USER,
+  SMTP_PASS,
+  SMTP_FROM
 } = process.env;
 
-// Initialize Resend client
-const resend = new Resend(RESEND_API_KEY);
+// Create transporter for Gmail SMTP
+const transporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: Number(SMTP_PORT),
+  secure: String(SMTP_SECURE).toLowerCase() === 'true',
+  auth: {
+    user: SMTP_USER,
+    pass: SMTP_PASS
+  },
+  connectionTimeout: 30_000,
+  greetingTimeout: 15_000,
+  socketTimeout: 30_000,
+  tls: {
+    rejectUnauthorized: false
+  }
+});
 
 async function sendEmail({ to, subject, text, html }) {
-  if (!RESEND_API_KEY) {
-    console.warn('Resend not configured. Missing: RESEND_API_KEY');
-    throw new Error('Email service not configured: missing RESEND_API_KEY');
+  const missing = [
+    ['SMTP_USER', SMTP_USER],
+    ['SMTP_PASS', SMTP_PASS],
+    ['SMTP_FROM', SMTP_FROM]
+  ].filter(([_, v]) => !v).map(([k]) => k);
+  
+  if (missing.length) {
+    console.warn(`SMTP not configured. Missing: ${missing.join(', ')}`);
+    throw new Error(`Email service not configured: missing ${missing.join(', ')}`);
   }
   
   try {
     console.log(`Attempting to send email to: ${to}`);
-    console.log(`Using Resend service`);
+    console.log(`Using SMTP: ${SMTP_HOST}:${SMTP_PORT}, user: ${SMTP_USER}`);
     
-    const result = await resend.emails.send({
-      from: RESEND_FROM,
-      to: [to],
-      subject,
-      text,
-      html
+    // Verify connection first
+    console.log('Verifying SMTP connection...');
+    await transporter.verify();
+    console.log('SMTP connection verified successfully');
+    
+    const result = await transporter.sendMail({
+      from: SMTP_FROM,
+      to: to,
+      subject: subject,
+      text: text,
+      html: html
     });
     
-    console.log('Email sent successfully:', result.data?.id);
-    console.log('Full result:', JSON.stringify(result, null, 2));
+    console.log('Email sent successfully:', result.messageId);
     return result;
   } catch (err) {
     console.error('Email sending error:', err.message);
