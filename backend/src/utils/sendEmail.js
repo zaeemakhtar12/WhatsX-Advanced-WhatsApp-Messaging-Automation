@@ -1,13 +1,18 @@
 const nodemailer = require('nodemailer');
 const { SENDGRID_API_KEY, SENDGRID_SENDER } = process.env;
 
-// Create transporter for Gmail SMTP
+// Create transporter for Gmail SMTP (explicit host/port with timeouts)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // use TLS
   auth: {
-    user: SENDGRID_SENDER, // Your Gmail address
-    pass: SENDGRID_API_KEY // Your Gmail app password
-  }
+    user: SENDGRID_SENDER, // Gmail address
+    pass: SENDGRID_API_KEY // Gmail App Password
+  },
+  connectionTimeout: 15_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 20_000
 });
 
 async function sendEmail({ to, subject, text, html }) {
@@ -18,6 +23,8 @@ async function sendEmail({ to, subject, text, html }) {
   
   try {
     console.log(`Attempting to send email to: ${to}`);
+    // Verify connection for clearer errors
+    await transporter.verify();
     const result = await transporter.sendMail({ 
       to, 
       from: SENDGRID_SENDER, 
