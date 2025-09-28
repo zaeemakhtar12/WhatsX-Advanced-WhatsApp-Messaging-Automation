@@ -1,86 +1,32 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const {
-  SMTP_HOST = 'smtp.gmail.com',
-  SMTP_PORT = '465',
-  SMTP_SECURE = 'true',
-  SMTP_USER,
-  SMTP_PASS,
-  SMTP_FROM
+  RESEND_API_KEY,
+  RESEND_FROM = 'WhatsX <onboarding@resend.dev>'
 } = process.env;
 
-// Create transporter for SMTP (defaults configured for Gmail)
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: Number(SMTP_PORT),
-  secure: String(SMTP_SECURE).toLowerCase() === 'true',
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS
-  },
-  requireTLS: false, // Try without requiring TLS first
-  connectionTimeout: 60_000, // Even longer timeout
-  greetingTimeout: 30_000,   // Longer greeting timeout
-  socketTimeout: 60_000,     // Longer socket timeout
-  tls: {
-    rejectUnauthorized: false, // Allow self-signed certificates
-    ciphers: 'SSLv3' // Try different cipher
-  },
-  pool: true, // Use connection pooling
-  maxConnections: 1,
-  maxMessages: 1
-});
+// Initialize Resend client
+const resend = new Resend(RESEND_API_KEY);
 
 async function sendEmail({ to, subject, text, html }) {
-  const missing = [
-    ['SMTP_USER', SMTP_USER],
-    ['SMTP_PASS', SMTP_PASS],
-    ['SMTP_FROM', SMTP_FROM]
-  ].filter(([_, v]) => !v).map(([k]) => k);
-  if (missing.length) {
-    console.warn(`SMTP not configured. Missing: ${missing.join(', ')}`);
-    throw new Error(`Email service not configured: missing ${missing.join(', ')}`);
+  if (!RESEND_API_KEY) {
+    console.warn('Resend not configured. Missing: RESEND_API_KEY');
+    throw new Error('Email service not configured: missing RESEND_API_KEY');
   }
   
   try {
     console.log(`Attempting to send email to: ${to}`);
-    console.log(`Using SMTP: ${SMTP_HOST}:${SMTP_PORT}, user: ${SMTP_USER}`);
+    console.log(`Using Resend service`);
     
-    // Try alternative Gmail SMTP settings if primary fails
-    let currentTransporter = transporter;
-    
-    try {
-      console.log('Verifying SMTP connection...');
-      await currentTransporter.verify();
-      console.log('SMTP connection verified successfully');
-    } catch (verifyErr) {
-      console.log('Primary SMTP failed, trying alternative Gmail settings...');
-      
-      // Try alternative Gmail SMTP configuration
-      const altTransporter = nodemailer.createTransport({
-        service: 'gmail', // Use service instead of host/port
-        auth: {
-          user: SMTP_USER,
-          pass: SMTP_PASS
-        },
-        connectionTimeout: 30_000,
-        greetingTimeout: 15_000,
-        socketTimeout: 30_000
-      });
-      
-      await altTransporter.verify();
-      console.log('Alternative SMTP connection verified successfully');
-      currentTransporter = altTransporter;
-    }
-    
-    const result = await currentTransporter.sendMail({ 
-      to, 
-      from: SMTP_FROM, 
-      subject, 
-      text, 
-      html 
+    const result = await resend.emails.send({
+      from: RESEND_FROM,
+      to: [to],
+      subject,
+      text,
+      html
     });
-    console.log('Email sent successfully:', result.messageId);
+    
+    console.log('Email sent successfully:', result.data?.id);
     return result;
   } catch (err) {
     console.error('Email sending error:', err.message);
