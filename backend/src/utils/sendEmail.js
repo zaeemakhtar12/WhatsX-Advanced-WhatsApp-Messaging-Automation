@@ -18,9 +18,12 @@ const transporter = nodemailer.createTransport({
     user: SMTP_USER,
     pass: SMTP_PASS
   },
-  connectionTimeout: 15_000,
-  greetingTimeout: 10_000,
-  socketTimeout: 20_000
+  connectionTimeout: 30_000, // Increased timeout
+  greetingTimeout: 15_000,   // Increased timeout
+  socketTimeout: 30_000,     // Increased timeout
+  tls: {
+    rejectUnauthorized: false // Allow self-signed certificates
+  }
 });
 
 async function sendEmail({ to, subject, text, html }) {
@@ -36,8 +39,13 @@ async function sendEmail({ to, subject, text, html }) {
   
   try {
     console.log(`Attempting to send email to: ${to}`);
+    console.log(`Using SMTP: ${SMTP_HOST}:${SMTP_PORT}, user: ${SMTP_USER}`);
+    
     // Verify connection for clearer errors
+    console.log('Verifying SMTP connection...');
     await transporter.verify();
+    console.log('SMTP connection verified successfully');
+    
     const result = await transporter.sendMail({ 
       to, 
       from: SMTP_FROM, 
@@ -49,6 +57,7 @@ async function sendEmail({ to, subject, text, html }) {
     return result;
   } catch (err) {
     console.error('Email sending error:', err.message);
+    console.error('Full error:', err);
     throw new Error(`Failed to send email: ${err.message}`);
   }
 }
