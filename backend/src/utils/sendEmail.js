@@ -1,28 +1,35 @@
-const sgMail = require('@sendgrid/mail');
+const nodemailer = require('nodemailer');
 const { SENDGRID_API_KEY, SENDGRID_SENDER } = process.env;
 
-if (SENDGRID_API_KEY) sgMail.setApiKey(SENDGRID_API_KEY);
+// Create transporter for Gmail SMTP
+const transporter = nodemailer.createTransporter({
+  service: 'gmail',
+  auth: {
+    user: SENDGRID_SENDER, // Your Gmail address
+    pass: SENDGRID_API_KEY // Your Gmail app password
+  }
+});
 
 async function sendEmail({ to, subject, text, html }) {
   if (!SENDGRID_API_KEY || !SENDGRID_SENDER) {
-    console.warn('SendGrid not configured');
+    console.warn('Email service not configured');
     throw new Error('Email service not configured');
   }
   
   try {
     console.log(`Attempting to send email to: ${to}`);
-    const result = await sgMail.send({ 
+    const result = await transporter.sendMail({ 
       to, 
       from: SENDGRID_SENDER, 
       subject, 
       text, 
       html 
     });
-    console.log('Email sent successfully:', result[0].statusCode);
+    console.log('Email sent successfully:', result.messageId);
     return result;
   } catch (err) {
-    console.error('SendGrid error:', err?.response?.body || err.message);
-    throw new Error(`Failed to send email: ${err?.response?.body?.errors?.[0]?.message || err.message}`);
+    console.error('Email sending error:', err.message);
+    throw new Error(`Failed to send email: ${err.message}`);
   }
 }
 module.exports = sendEmail;
