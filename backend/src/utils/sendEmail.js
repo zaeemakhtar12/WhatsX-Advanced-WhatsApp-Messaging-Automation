@@ -39,6 +39,7 @@ async function sendEmail({ to, subject, text, html }) {
   // If a Vercel email endpoint is configured, offload email sending to Vercel Serverless
   if (vercelEmailEndpoint) {
     try {
+      console.log('Using Vercel email endpoint:', vercelEmailEndpoint);
       const response = await fetch(vercelEmailEndpoint, {
         method: 'POST',
         headers: {

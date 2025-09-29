@@ -25,6 +25,9 @@ const app = express();
 // Security & Middleware
 app.use(helmet());
 
+// Behind proxies (Render) so Express should trust X-Forwarded-* headers
+app.set('trust proxy', true);
+
 const allowedOrigins = (process.env.CLIENT_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
   origin: (origin, callback) => {
