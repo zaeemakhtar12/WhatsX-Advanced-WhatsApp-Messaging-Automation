@@ -1,0 +1,12 @@
+{
+  "name": "email-api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "api/send-email.js",
+  "license": "MIT",
+  "dependencies": {
+    "nodemailer": "^6.10.1"
+  }
+}
+
+
