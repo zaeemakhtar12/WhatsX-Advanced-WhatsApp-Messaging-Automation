@@ -33,6 +33,35 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendEmail({ to, subject, text, html }) {
+  const vercelEmailEndpoint = process.env.VERCEL_EMAIL_ENDPOINT;
+  const emailFunctionSecret = process.env.EMAIL_FUNCTION_SECRET;
+
+  // If a Vercel email endpoint is configured, offload email sending to Vercel Serverless
+  if (vercelEmailEndpoint) {
+    try {
+      const response = await fetch(vercelEmailEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(emailFunctionSecret ? { 'X-Email-Secret': emailFunctionSecret } : {})
+        },
+        body: JSON.stringify({ to, subject, text, html })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Vercel email endpoint failed (${response.status}): ${errText}`);
+      }
+
+      const data = await response.json();
+      console.log('Email sent via Vercel function:', data.messageId || data);
+      return data;
+    } catch (err) {
+      console.error('Vercel email endpoint error:', err);
+      throw err;
+    }
+  }
+
   const missing = [
     ['SMTP_USER', SMTP_USER],
     ['SMTP_PASS', SMTP_PASS],
